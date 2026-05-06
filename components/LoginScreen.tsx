@@ -2,37 +2,70 @@
 import { useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-client'
 
-type Step = 'form' | 'sent'
+type Mode = 'login' | 'register'
 
 export function LoginScreen() {
+  const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
-  const [rememberMe, setRememberMe] = useState(true)
-  const [step, setStep] = useState<Step>('form')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  function switchMode(m: Mode) {
+    setMode(m)
+    setError(null)
+    setSuccess(null)
+    setPassword('')
+    setConfirmPassword('')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
+
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('As senhas não coincidem.')
+      return
+    }
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.')
+      return
+    }
+
     setLoading(true)
 
-    // Salva preferência ANTES do clique no magic link, pois o redirect
-    // é um page reload e o cliente Supabase lê essa key na inicialização.
-    localStorage.setItem('copa_remember_me', rememberMe ? '1' : '0')
-
-    const { error } = await supabaseBrowser.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    })
+    if (mode === 'login') {
+      const { error } = await supabaseBrowser.auth.signInWithPassword({ email, password })
+      if (error) setError(translateError(error.message))
+    } else {
+      const { error } = await supabaseBrowser.auth.signUp({ email, password })
+      if (error) {
+        setError(translateError(error.message))
+      } else {
+        setSuccess('Conta criada! Verifique seu e-mail para confirmar o cadastro.')
+      }
+    }
 
     setLoading(false)
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setStep('sent')
-    }
   }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '11px 14px',
+    borderRadius: 10,
+    border: '1.5px solid var(--border)',
+    background: 'var(--bg)',
+    color: 'var(--text)',
+    fontSize: 15,
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box',
+  }
+
+  const isDisabled = loading || !email || !password || (mode === 'register' && !confirmPassword)
 
   return (
     <div style={{
@@ -71,109 +104,125 @@ export function LoginScreen() {
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 16,
-        padding: '28px 24px',
+        padding: '24px 24px 28px',
       }}>
-        {step === 'form' ? (
-          <>
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-                Entrar
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                Enviaremos um link para o seu e-mail.
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '11px 14px',
-                  borderRadius: 10,
-                  border: '1.5px solid var(--border)',
-                  background: 'var(--bg)',
-                  color: 'var(--text)',
-                  fontSize: 15,
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
-              />
-
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                cursor: 'pointer', userSelect: 'none',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  style={{ width: 16, height: 16, accentColor: 'var(--green)', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  Lembrar de mim por 30 dias
-                </span>
-              </label>
-
-              {error && (
-                <div style={{ fontSize: 13, color: 'var(--red)', padding: '8px 12px', background: '#fef2f2', borderRadius: 8 }}>
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading || !email}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: loading || !email ? 'var(--border)' : 'var(--green)',
-                  color: loading || !email ? 'var(--text-muted)' : '#fff',
-                  fontSize: 15,
-                  fontWeight: 600,
-                  cursor: loading || !email ? 'not-allowed' : 'pointer',
-                  fontFamily: 'inherit',
-                  transition: 'background 0.15s',
-                }}
-              >
-                {loading ? 'Enviando…' : 'Enviar link'}
-              </button>
-            </form>
-          </>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '8px 0' }}>
-            <div style={{ fontSize: 36, marginBottom: 16 }}>✉️</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
-              Link enviado!
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Verifique seu e-mail <strong>{email}</strong> e clique no link para entrar.
-            </div>
+        {/* Mode tabs */}
+        <div style={{
+          display: 'flex',
+          background: 'var(--bg)',
+          borderRadius: 10,
+          padding: 4,
+          marginBottom: 24,
+        }}>
+          {(['login', 'register'] as Mode[]).map((m) => (
             <button
-              onClick={() => { setStep('form'); setEmail('') }}
+              key={m}
+              onClick={() => switchMode(m)}
               style={{
-                marginTop: 20,
-                fontSize: 13,
-                color: 'var(--green)',
-                background: 'none',
+                flex: 1,
+                padding: '8px 0',
+                borderRadius: 7,
                 border: 'none',
+                background: mode === m ? 'var(--surface)' : 'transparent',
+                color: mode === m ? 'var(--text)' : 'var(--text-muted)',
+                fontSize: 14,
+                fontWeight: mode === m ? 600 : 400,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
+                transition: 'all 0.15s',
+                boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
               }}
             >
-              Usar outro e-mail
+              {m === 'login' ? 'Entrar' : 'Cadastrar'}
             </button>
-          </div>
-        )}
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input
+            type="email"
+            placeholder="seu@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={inputStyle}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+          />
+
+          <input
+            type="password"
+            placeholder="Senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            style={inputStyle}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+          />
+
+          {mode === 'register' && (
+            <input
+              type="password"
+              placeholder="Confirmar senha"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              style={inputStyle}
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            />
+          )}
+
+          {error && (
+            <div style={{
+              fontSize: 13, color: 'var(--red)',
+              padding: '8px 12px', background: '#fef2f2', borderRadius: 8,
+            }}>
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div style={{
+              fontSize: 13, color: 'var(--green)',
+              padding: '8px 12px', background: '#f0fdf4', borderRadius: 8,
+            }}>
+              {success}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isDisabled}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 10,
+              border: 'none',
+              background: isDisabled ? 'var(--border)' : 'var(--green)',
+              color: isDisabled ? 'var(--text-muted)' : '#fff',
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              transition: 'background 0.15s',
+              marginTop: 4,
+            }}
+          >
+            {loading ? (mode === 'login' ? 'Entrando…' : 'Criando conta…') : (mode === 'login' ? 'Entrar' : 'Criar conta')}
+          </button>
+        </form>
       </div>
     </div>
   )
+}
+
+function translateError(msg: string): string {
+  if (msg.includes('Invalid login credentials')) return 'E-mail ou senha incorretos.'
+  if (msg.includes('Email not confirmed')) return 'Confirme seu e-mail antes de entrar.'
+  if (msg.includes('User already registered')) return 'Este e-mail já está cadastrado.'
+  if (msg.includes('Password should be at least')) return 'A senha deve ter pelo menos 6 caracteres.'
+  if (msg.includes('rate limit')) return 'Muitas tentativas. Aguarde um momento.'
+  return msg
 }
