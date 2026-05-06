@@ -1,0 +1,49 @@
+import { z } from 'zod'
+import { TRPCError } from '@trpc/server'
+import { protectedProcedure, router } from '../trpc'
+import { supabaseAdmin } from '../db'
+
+const usernameSchema = z.string().regex(
+  /^[a-zA-Z0-9_]{3,20}$/,
+  'Username inválido: 3–20 caracteres, letras, números e _',
+)
+
+export const profileRouter = router({
+  get: protectedProcedure.query(async ({ ctx }) => {
+    const { data } = await supabaseAdmin
+      .from('profiles')
+      .select('username')
+      .eq('user_id', ctx.userId)
+      .maybeSingle()
+    return data ? { username: data.username } : null
+  }),
+
+  checkUsername: protectedProcedure
+    .input(z.object({ username: z.string() }))
+    .query(async ({ input }) => {
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(input.username)) {
+        return { available: false }
+      }
+      const { data } = await supabaseAdmin
+        .from('profiles')
+        .select('user_id')
+        .ilike('username', input.username)
+        .maybeSingle()
+      return { available: data === null }
+    }),
+
+  create: protectedProcedure
+    .input(z.object({ username: usernameSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const { error } = await supabaseAdmin
+        .from('profiles')
+        .insert({ user_id: ctx.userId, username: input.username })
+      if (error) {
+        if (error.code === '23505') {
+          throw new TRPCError({ code: 'CONFLICT', message: 'Username já existe' })
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      }
+      return { username: input.username }
+    }),
+})
