@@ -6,25 +6,29 @@ type StickerEntry = {
   quantity: number
 }
 
-function csvRow(fields: string[]): string {
-  return fields
-    .map((f) => (f.includes(',') || f.includes('"') || f.includes('\n') || f.includes('\r') ? `"${f.replace(/"/g, '""')}"` : f))
-    .join(',')
+function esc(f: string): string {
+  return f.includes(',') || f.includes('"') || f.includes('\n') || f.includes('\r')
+    ? `"${f.replace(/"/g, '""')}"`
+    : f
 }
 
 export function generateCSV(stickers: StickerEntry[], username: string): void {
-  const rows: string[] = ['tipo,id,nome,secao,quantidade']
+  const repeated = stickers.filter((s) => s.status === 'repeated')
+  const missing = stickers.filter((s) => s.status === 'missing')
+  const len = Math.max(repeated.length, missing.length)
 
-  for (const s of stickers) {
-    if (s.status === 'repeated') {
-      rows.push(csvRow(['repetida', s.id, s.countryName, s.section, String(s.quantity)]))
-    }
-  }
+  const rows: string[] = ['REPETIDAS,Nome,Extras,,FALTANDO,Nome']
 
-  for (const s of stickers) {
-    if (s.status === 'missing') {
-      rows.push(csvRow(['faltando', s.id, s.countryName, s.section, '']))
-    }
+  for (let i = 0; i < len; i++) {
+    const r = repeated[i]
+    const m = missing[i]
+    const left = r
+      ? `${esc(r.id)},${esc(r.countryName)},×${r.quantity - 1}`
+      : ',,'
+    const right = m
+      ? `${esc(m.id)},${esc(m.countryName)}`
+      : ','
+    rows.push(`${left},,${right}`)
   }
 
   const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' })
