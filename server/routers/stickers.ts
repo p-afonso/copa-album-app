@@ -105,4 +105,48 @@ export const stickersRouter = router({
       extras: (qtyMap.get(s.id) ?? 1) - 1,
     }))
   }),
+
+  decrementRepeated: protectedProcedure
+    .input(z.object({ stickerId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { data, error: fetchError } = await supabaseAdmin
+        .from('user_stickers')
+        .select('quantity')
+        .eq('user_id', ctx.userId)
+        .eq('sticker_id', input.stickerId)
+        .maybeSingle()
+
+      if (fetchError) throw new Error(fetchError.message)
+      if (!data) throw new Error('Figurinha não encontrada')
+
+      const qty = data.quantity
+
+      if (qty <= 1) {
+        const { error } = await supabaseAdmin
+          .from('user_stickers')
+          .delete()
+          .eq('user_id', ctx.userId)
+          .eq('sticker_id', input.stickerId)
+        if (error) throw new Error(error.message)
+        return { status: 'missing' as const, quantity: 0 }
+      }
+
+      if (qty === 2) {
+        const { error } = await supabaseAdmin
+          .from('user_stickers')
+          .update({ status: 'obtained', quantity: 1, updated_at: new Date().toISOString() })
+          .eq('user_id', ctx.userId)
+          .eq('sticker_id', input.stickerId)
+        if (error) throw new Error(error.message)
+        return { status: 'obtained' as const, quantity: 1 }
+      }
+
+      const { error } = await supabaseAdmin
+        .from('user_stickers')
+        .update({ quantity: qty - 1, updated_at: new Date().toISOString() })
+        .eq('user_id', ctx.userId)
+        .eq('sticker_id', input.stickerId)
+      if (error) throw new Error(error.message)
+      return { status: 'repeated' as const, quantity: qty - 1 }
+    }),
 })
