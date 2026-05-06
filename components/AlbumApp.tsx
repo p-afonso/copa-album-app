@@ -65,20 +65,20 @@ export function AlbumApp() {
   const utils = trpc.useUtils()
 
   useEffect(() => {
-    if (!session || !activeAlbum) return
+    if (!session || !activeAlbumId) return
     const channel = supabaseBrowser
-      .channel(`album_stickers_${activeAlbum.id}`)
+      .channel(`album_stickers_${activeAlbumId}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'album_stickers',
-        filter: `album_id=eq.${activeAlbum.id}`,
+        filter: `album_id=eq.${activeAlbumId}`,
       }, () => {
-        utils.stickers.list.invalidate({ albumId: activeAlbum.id })
-        utils.stickers.getProgress.invalidate({ albumId: activeAlbum.id })
-        utils.stickers.listDuplicates.invalidate({ albumId: activeAlbum.id })
+        utils.stickers.list.invalidate({ albumId: activeAlbumId })
+        utils.stickers.getProgress.invalidate({ albumId: activeAlbumId })
+        utils.stickers.listDuplicates.invalidate({ albumId: activeAlbumId })
       })
       .subscribe()
     return () => { supabaseBrowser.removeChannel(channel) }
-  }, [utils, session, activeAlbum])
+  }, [utils, session, activeAlbumId])
 
   const handleAction = useCallback((id: string) => setSelectedId(id), [])
   const handleClose = useCallback(() => setSelectedId(null), [])
