@@ -14,11 +14,29 @@ type Props = {
 export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
   const utils = trpc.useUtils()
   const update = trpc.stickers.updateStatus.useMutation({
-    onSuccess: () => {
+    onMutate: async ({ stickerId, status, quantity }) => {
+      onClose()
+      await utils.stickers.list.cancel()
+      const prev = utils.stickers.list.getData()
+      utils.stickers.list.setData(undefined, (old) =>
+        old?.map((s) => {
+          if (s.id !== stickerId) return s
+          const newQty =
+            status === 'repeated' ? (quantity ?? 2)
+            : status === 'obtained' ? 1
+            : 0
+          return { ...s, status, quantity: newQty }
+        }),
+      )
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) utils.stickers.list.setData(undefined, ctx.prev)
+    },
+    onSettled: () => {
       utils.stickers.list.invalidate()
       utils.stickers.getProgress.invalidate()
       utils.stickers.listDuplicates.invalidate()
-      onClose()
     },
   })
 
