@@ -29,9 +29,9 @@ const CARD_STYLES: Record<Status, React.CSSProperties> = {
 }
 
 const NUM_COLOR: Record<Status, string> = {
-  missing:  '#b8ccb8',
-  obtained: 'rgba(255,255,255,0.95)',
-  repeated: 'rgba(255,255,255,0.95)',
+  missing:  '#0a0f0a',
+  obtained: '#ffffff',
+  repeated: '#2d1000',
 }
 
 export function StickerCard({ id, number, status, quantity, onAction }: Props) {

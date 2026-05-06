@@ -43,3 +43,5 @@ next-env.d.ts
 # temp files
 *.tmp.jpg
 *.tmp.png
+
+.vercel
