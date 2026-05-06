@@ -12,6 +12,7 @@ import { OnboardingScreen } from './OnboardingScreen'
 import { TabBar, type Tab } from './TabBar'
 import { RepeatedView } from './RepeatedView'
 import { StickerGridSkeleton } from './StickerGridSkeleton'
+import { AlbumSelectionScreen } from './AlbumSelectionScreen'
 
 function LoadingSpinner() {
   return (
@@ -105,36 +106,14 @@ export function AlbumApp() {
 
   if (albums.isLoading) return <LoadingSpinner />
 
-  // No active album or invalid activeAlbumId → placeholder (will be replaced in Task 5)
   if (!activeAlbum) {
     return (
-      <div style={{
-        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24,
-      }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, color: 'var(--green)' }}>
-          COPA 2026
-        </div>
-        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>@{username}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 320 }}>
-          {(albums.data ?? []).map((a) => (
-            <button
-              key={a.id}
-              onClick={() => selectAlbum(a.id)}
-              style={{
-                padding: '14px 16px', borderRadius: 14, background: 'var(--surface)',
-                border: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}
-            >
-              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{a.name}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                {a.progress.obtained}/{a.progress.total}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <AlbumSelectionScreen
+        albums={albums.data ?? []}
+        username={username}
+        onSelect={selectAlbum}
+        onRefetch={() => albums.refetch()}
+      />
     )
   }
 
