@@ -58,7 +58,7 @@ create policy "update_own" on profiles
 
 | Procedure | Tipo | Descrição |
 |---|---|---|
-| `stickers.decrementRepeated` | mutation | Input: `{ stickerId: string }` → decrementa `quantity` em 1. Se `quantity` era 2 → muda status para `obtained`. Se era 1 → deleta a linha. |
+| `stickers.decrementRepeated` | mutation | Input: `{ stickerId: string }` → decrementa `quantity` em 1. Se `quantity > 2` → permanece `repeated` com `quantity - 1`. Se `quantity = 2` → muda status para `obtained` com `quantity = 1`. Se `quantity = 1` → deleta a linha (volta para `missing`). |
 
 ---
 
