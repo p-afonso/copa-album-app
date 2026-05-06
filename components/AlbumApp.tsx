@@ -8,12 +8,36 @@ import { ProgressPanel } from './ProgressPanel'
 import { FilterBar } from './FilterBar'
 import { ActionSheet } from './ActionSheet'
 import { LoginScreen } from './LoginScreen'
+import { OnboardingScreen } from './OnboardingScreen'
+import { TabBar, type Tab } from './TabBar'
+import { RepeatedView } from './RepeatedView'
+
+function LoadingSpinner() {
+  return (
+    <div style={{
+      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: 12,
+    }}>
+      <div style={{
+        fontFamily: "'Bebas Neue', sans-serif",
+        fontSize: 48, letterSpacing: '0.05em', color: 'var(--green)', lineHeight: 1,
+      }}>COPA 2026</div>
+      <div style={{ width: 120, height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: '40%', background: 'var(--green)',
+          borderRadius: 99, animation: 'loading-bar 1.2s ease-in-out infinite',
+        }} />
+      </div>
+    </div>
+  )
+}
 
 export function AlbumApp() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [activeSection, setActiveSection] = useState('all')
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('album')
 
   // Auth state
   useEffect(() => {
@@ -22,9 +46,12 @@ export function AlbumApp() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Profile
+  const profile = trpc.profile.get.useQuery(undefined, { enabled: !!session })
+
   const { data: stickers = [], isLoading } = trpc.stickers.list.useQuery(
     undefined,
-    { enabled: !!session },
+    { enabled: !!session && !!profile.data },
   )
   const utils = trpc.useUtils()
 
@@ -45,51 +72,27 @@ export function AlbumApp() {
   const handleAction = useCallback((id: string) => setSelectedId(id), [])
   const handleClose = useCallback(() => setSelectedId(null), [])
 
-  // session === undefined → ainda verificando
-  if (session === undefined) {
-    return (
-      <div style={{
-        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 12,
-      }}>
-        <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 48, letterSpacing: '0.05em', color: 'var(--green)',
-          lineHeight: 1,
-        }}>COPA 2026</div>
-        <div style={{ width: 120, height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', width: '40%', background: 'var(--green)',
-            borderRadius: 99, animation: 'loading-bar 1.2s ease-in-out infinite',
-          }} />
-        </div>
-      </div>
-    )
-  }
+  // session === undefined → verificando
+  if (session === undefined) return <LoadingSpinner />
 
-  // session === null → não autenticado
+  // não autenticado
   if (!session) return <LoginScreen />
 
-  if (isLoading) {
-    return (
-      <div style={{
-        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 12,
-      }}>
-        <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 48, letterSpacing: '0.05em', color: 'var(--green)',
-          lineHeight: 1,
-        }}>COPA 2026</div>
-        <div style={{ width: 120, height: 3, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', width: '40%', background: 'var(--green)',
-            borderRadius: 99, animation: 'loading-bar 1.2s ease-in-out infinite',
-          }} />
-        </div>
-      </div>
-    )
+  // perfil carregando
+  if (profile.isLoading) return <LoadingSpinner />
+
+  // sem username → onboarding
+  if (profile.data === null || profile.data === undefined) {
+    if (profile.data === null) {
+      return <OnboardingScreen onComplete={() => profile.refetch()} />
+    }
+    return <LoadingSpinner />
   }
+
+  // stickers carregando
+  if (isLoading) return <LoadingSpinner />
+
+  const username = profile.data.username
 
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 600, margin: '0 auto' }}>
@@ -99,12 +102,14 @@ export function AlbumApp() {
         {/* Logo bar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px 10px',
+          padding: '10px 16px',
           background: 'var(--surface)',
           borderBottom: '1px solid var(--border)',
           borderTop: '3px solid var(--green)',
         }}>
-          <div style={{ width: 32 }} />
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, minWidth: 60 }}>
+            @{username}
+          </div>
           <div style={{
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: 26, letterSpacing: '0.06em', color: 'var(--text)', lineHeight: 1,
@@ -117,30 +122,42 @@ export function AlbumApp() {
             style={{
               width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-dim)', fontSize: 18, borderRadius: 8,
+              color: 'var(--text-dim)', fontSize: 18, borderRadius: 8, minWidth: 32,
             }}
           >
             ⎋
           </button>
         </div>
 
-        <ProgressPanel />
-        <FilterBar
-          activeSection={activeSection}
-          search={search}
-          onSectionChange={setActiveSection}
-          onSearchChange={setSearch}
-        />
+        {/* Tabs */}
+        <TabBar activeTab={activeTab} onChange={setActiveTab} />
+
+        {/* Album-only header content */}
+        {activeTab === 'album' && (
+          <>
+            <ProgressPanel />
+            <FilterBar
+              activeSection={activeSection}
+              search={search}
+              onSectionChange={setActiveSection}
+              onSearchChange={setSearch}
+            />
+          </>
+        )}
       </div>
 
       {/* ─── Content ─── */}
-      <div style={{ flex: 1, paddingTop: 16 }}>
-        <StickerGrid
-          stickers={stickers}
-          activeSection={activeSection}
-          search={search}
-          onAction={handleAction}
-        />
+      <div style={{ flex: 1, paddingTop: activeTab === 'album' ? 16 : 0 }}>
+        {activeTab === 'album' ? (
+          <StickerGrid
+            stickers={stickers}
+            activeSection={activeSection}
+            search={search}
+            onAction={handleAction}
+          />
+        ) : (
+          <RepeatedView username={username} />
+        )}
       </div>
 
       {/* ─── Action sheet ─── */}
