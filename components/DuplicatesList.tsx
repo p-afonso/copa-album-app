@@ -1,8 +1,10 @@
 'use client'
 import { trpc } from '@/lib/trpc'
 
-export function DuplicatesList() {
-  const { data } = trpc.stickers.listDuplicates.useQuery()
+type Props = { albumId: string }
+
+export function DuplicatesList({ albumId }: Props) {
+  const { data } = trpc.stickers.listDuplicates.useQuery({ albumId })
 
   if (!data || data.length === 0) return null
 

@@ -2,17 +2,17 @@
 import { trpc } from '@/lib/trpc'
 import { generateCSV } from '@/lib/export-csv'
 
-type Props = { username: string }
+type Props = { albumId: string; username: string }
 
-export function RepeatedView({ username }: Props) {
-  const { data: stickers = [] } = trpc.stickers.list.useQuery()
+export function RepeatedView({ albumId, username }: Props) {
+  const { data: stickers = [] } = trpc.stickers.list.useQuery({ albumId })
   const utils = trpc.useUtils()
 
   const decrement = trpc.stickers.decrementRepeated.useMutation({
-    onMutate: async ({ stickerId }) => {
+    onMutate: async ({ albumId, stickerId }) => {
       await utils.stickers.list.cancel()
-      const prev = utils.stickers.list.getData()
-      utils.stickers.list.setData(undefined, (old) =>
+      const prev = utils.stickers.list.getData({ albumId })
+      utils.stickers.list.setData({ albumId }, (old) =>
         old?.map((s) => {
           if (s.id !== stickerId) return s
           if (s.quantity <= 1) return { ...s, status: 'missing' as const, quantity: 0 }
@@ -22,20 +22,19 @@ export function RepeatedView({ username }: Props) {
       )
       return { prev }
     },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) utils.stickers.list.setData(undefined, ctx.prev)
+    onError: (_err, vars, ctx) => {
+      if (ctx?.prev) utils.stickers.list.setData({ albumId: vars.albumId }, ctx.prev)
     },
-    onSettled: () => {
-      utils.stickers.list.invalidate()
-      utils.stickers.getProgress.invalidate()
-      utils.stickers.listDuplicates.invalidate()
+    onSettled: (_data, _err, vars) => {
+      utils.stickers.list.invalidate({ albumId: vars.albumId })
+      utils.stickers.getProgress.invalidate({ albumId: vars.albumId })
+      utils.stickers.listDuplicates.invalidate({ albumId: vars.albumId })
     },
   })
 
   const repeated = stickers.filter((s) => s.status === 'repeated')
   const totalExtras = repeated.reduce((sum, s) => sum + (s.quantity - 1), 0)
 
-  // Group by section
   const groups = repeated.reduce<Record<string, typeof repeated>>((acc, s) => {
     if (!acc[s.section]) acc[s.section] = []
     acc[s.section].push(s)
@@ -56,11 +55,9 @@ export function RepeatedView({ username }: Props) {
 
   return (
     <div style={{ paddingBottom: 80 }}>
-      {/* Toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px',
-        borderBottom: '1px solid var(--border)',
+        padding: '10px 16px', borderBottom: '1px solid var(--border)',
       }}>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
           {repeated.length} figurinha{repeated.length !== 1 ? 's' : ''} ·{' '}
@@ -69,46 +66,32 @@ export function RepeatedView({ username }: Props) {
         <button
           onClick={() => generateCSV(stickers, username)}
           style={{
-            padding: '5px 12px',
-            borderRadius: 8,
-            border: '1.5px solid var(--border)',
-            background: 'var(--surface-2)',
-            color: 'var(--text-muted)',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
+            padding: '5px 12px', borderRadius: 8, border: '1.5px solid var(--border)',
+            background: 'var(--surface-2)', color: 'var(--text-muted)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
           Exportar CSV
         </button>
       </div>
 
-      {/* Groups */}
       {Object.entries(groups).map(([section, items]) => (
         <div key={section}>
           <div style={{
-            padding: '5px 16px',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: 'var(--text-dim)',
-            background: 'var(--surface)',
-            borderBottom: '1px solid var(--border)',
+            padding: '5px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: 'var(--text-dim)',
+            background: 'var(--surface)', borderBottom: '1px solid var(--border)',
           }}>
             {section}
           </div>
           {items.map((s) => (
             <div key={s.id} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 16px',
-              borderBottom: '1px solid var(--border)',
+              padding: '10px 16px', borderBottom: '1px solid var(--border)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: 14, letterSpacing: '0.04em',
+                  fontFamily: "'Bebas Neue', sans-serif", fontSize: 14, letterSpacing: '0.04em',
                   color: 'var(--gold)', minWidth: 52,
                 }}>
                   {s.id}
@@ -123,18 +106,14 @@ export function RepeatedView({ username }: Props) {
                 </div>
               </div>
               <button
-                onClick={() => decrement.mutate({ stickerId: s.id })}
+                onClick={() => decrement.mutate({ albumId, stickerId: s.id })}
                 disabled={decrement.isPending}
                 style={{
-                  width: 32, height: 32,
-                  borderRadius: 8,
-                  border: '1.5px solid var(--border)',
-                  background: 'var(--surface-2)',
-                  color: 'var(--text-muted)',
-                  fontSize: 20, lineHeight: 1,
+                  width: 32, height: 32, borderRadius: 8,
+                  border: '1.5px solid var(--border)', background: 'var(--surface-2)',
+                  color: 'var(--text-muted)', fontSize: 20, lineHeight: 1,
                   cursor: decrement.isPending ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit',
                 }}
               >
                 −

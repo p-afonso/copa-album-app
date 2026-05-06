@@ -5,20 +5,21 @@ import { trpc } from '@/lib/trpc'
 type Status = 'missing' | 'obtained' | 'repeated'
 
 type Props = {
+  albumId: string
   stickerId: string
   status: Status
   quantity: number
   onClose: () => void
 }
 
-export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
+export function ActionSheet({ albumId, stickerId, status, quantity, onClose }: Props) {
   const utils = trpc.useUtils()
   const update = trpc.stickers.updateStatus.useMutation({
-    onMutate: async ({ stickerId, status, quantity }) => {
+    onMutate: async ({ albumId, stickerId, status, quantity }) => {
       onClose()
       await utils.stickers.list.cancel()
-      const prev = utils.stickers.list.getData()
-      utils.stickers.list.setData(undefined, (old) =>
+      const prev = utils.stickers.list.getData({ albumId })
+      utils.stickers.list.setData({ albumId }, (old) =>
         old?.map((s) => {
           if (s.id !== stickerId) return s
           const newQty =
@@ -30,17 +31,16 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
       )
       return { prev }
     },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) utils.stickers.list.setData(undefined, ctx.prev)
+    onError: (_err, vars, ctx) => {
+      if (ctx?.prev) utils.stickers.list.setData({ albumId: vars.albumId }, ctx.prev)
     },
-    onSettled: () => {
-      utils.stickers.list.invalidate()
-      utils.stickers.getProgress.invalidate()
-      utils.stickers.listDuplicates.invalidate()
+    onSettled: (_data, _err, vars) => {
+      utils.stickers.list.invalidate({ albumId: vars.albumId })
+      utils.stickers.getProgress.invalidate({ albumId: vars.albumId })
+      utils.stickers.listDuplicates.invalidate({ albumId: vars.albumId })
     },
   })
 
-  // Quantity state — starts at 1 for missing, current qty for repeated
   const [qty, setQty] = useState(status === 'repeated' ? quantity : 1)
 
   useEffect(() => {
@@ -51,18 +51,18 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
 
   function add() {
     const newStatus = qty > 1 ? 'repeated' : 'obtained'
-    update.mutate({ stickerId, status: newStatus, quantity: qty > 1 ? qty : undefined })
+    update.mutate({ albumId, stickerId, status: newStatus, quantity: qty > 1 ? qty : undefined })
   }
 
   function remove() {
-    update.mutate({ stickerId, status: 'missing' })
+    update.mutate({ albumId, stickerId, status: 'missing' })
   }
 
   function setRepeated(newQty: number) {
     if (newQty < 2) {
-      update.mutate({ stickerId, status: 'obtained' })
+      update.mutate({ albumId, stickerId, status: 'obtained' })
     } else {
-      update.mutate({ stickerId, status: 'repeated', quantity: newQty })
+      update.mutate({ albumId, stickerId, status: 'repeated', quantity: newQty })
     }
   }
 
@@ -82,37 +82,28 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-      {/* Backdrop */}
       <div
         className="backdrop-enter"
         style={{ position: 'absolute', inset: 0, background: 'rgba(24,40,24,0.45)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}
       />
-
-      {/* Sheet */}
       <div
         className="sheet-enter"
         style={{
-          position: 'relative',
-          background: 'var(--surface)',
-          borderTop: '1px solid var(--border)',
-          borderRadius: '24px 24px 0 0',
-          paddingBottom: 'env(safe-area-inset-bottom, 20px)',
-          overflow: 'hidden',
+          position: 'relative', background: 'var(--surface)',
+          borderTop: '1px solid var(--border)', borderRadius: '24px 24px 0 0',
+          paddingBottom: 'env(safe-area-inset-bottom, 20px)', overflow: 'hidden',
         }}
       >
-        {/* Handle */}
         <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
           <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--border-2)' }} />
         </div>
 
-        {/* Sticker preview */}
         <div style={{ padding: '12px 20px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
             width: 56, height: 56, borderRadius: 14, flexShrink: 0,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            background: cardGradient,
-            border: `2px solid ${cardBorder}`,
+            background: cardGradient, border: `2px solid ${cardBorder}`,
             boxShadow: status !== 'missing' ? `0 4px 16px ${status === 'obtained' ? 'rgba(21,128,61,0.25)' : 'rgba(180,83,9,0.25)'}` : 'none',
           }}>
             <span style={{ fontFamily: "'Bebas Neue'", fontSize: 22, lineHeight: 1, color: numColor }}>{label}</span>
@@ -133,8 +124,6 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
         </div>
 
         <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-          {/* ── MISSING: add with quantity ── */}
           {status === 'missing' && (
             <>
               <div style={{
@@ -163,7 +152,6 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
             </>
           )}
 
-          {/* ── OBTAINED: add repeated or remove ── */}
           {status === 'obtained' && (
             <>
               <div style={{
@@ -178,7 +166,7 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
               </div>
               {qty > 1 && (
                 <button
-                  onClick={() => update.mutate({ stickerId, status: 'repeated', quantity: qty })}
+                  onClick={() => update.mutate({ albumId, stickerId, status: 'repeated', quantity: qty })}
                   disabled={update.isPending}
                   style={{
                     height: 54, borderRadius: 14, fontSize: 15, fontWeight: 700,
@@ -206,7 +194,6 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
             </>
           )}
 
-          {/* ── REPEATED: adjust qty or remove ── */}
           {status === 'repeated' && (
             <>
               <div style={{
@@ -214,9 +201,7 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
                 background: '#fef3c7', border: '1.5px solid #fde68a',
                 borderRadius: 14, padding: '10px 16px', height: 58,
               }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>
-                  Cópias
-                </span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--gold)' }}>Cópias</span>
                 <Stepper value={qty} min={1} max={99} accent="var(--gold)" onChange={(v) => { setQty(v); setRepeated(v) }} />
               </div>
               <button
@@ -234,7 +219,6 @@ export function ActionSheet({ stickerId, status, quantity, onClose }: Props) {
             </>
           )}
 
-          {/* Cancel */}
           <button
             onClick={onClose}
             style={{

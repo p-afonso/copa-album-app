@@ -39,101 +39,142 @@ export function AlbumApp() {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('album')
+  const [activeAlbumId, setActiveAlbumId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('copa_active_album_id')
+  })
 
-  // Auth state
   useEffect(() => {
     supabaseBrowser.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: { subscription } } = supabaseBrowser.auth.onAuthStateChange((_, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
 
-  // Profile
   const profile = trpc.profile.get.useQuery(undefined, { enabled: !!session })
 
+  const albums = trpc.albums.list.useQuery(undefined, {
+    enabled: !!session && !!profile.data,
+  })
+
+  const activeAlbum = albums.data?.find((a) => a.id === activeAlbumId) ?? null
+
   const { data: stickers = [], isLoading } = trpc.stickers.list.useQuery(
-    undefined,
-    { enabled: !!session && !!profile.data },
+    { albumId: activeAlbumId! },
+    { enabled: !!session && !!profile.data && !!activeAlbum },
   )
   const utils = trpc.useUtils()
 
-  // Supabase Realtime — sync entre dispositivos
   useEffect(() => {
-    if (!session) return
+    if (!session || !activeAlbum) return
     const channel = supabaseBrowser
-      .channel('user_stickers_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stickers' }, () => {
-        utils.stickers.list.invalidate()
-        utils.stickers.getProgress.invalidate()
-        utils.stickers.listDuplicates.invalidate()
+      .channel(`album_stickers_${activeAlbum.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'album_stickers',
+        filter: `album_id=eq.${activeAlbum.id}`,
+      }, () => {
+        utils.stickers.list.invalidate({ albumId: activeAlbum.id })
+        utils.stickers.getProgress.invalidate({ albumId: activeAlbum.id })
+        utils.stickers.listDuplicates.invalidate({ albumId: activeAlbum.id })
       })
       .subscribe()
     return () => { supabaseBrowser.removeChannel(channel) }
-  }, [utils, session])
+  }, [utils, session, activeAlbum])
 
   const handleAction = useCallback((id: string) => setSelectedId(id), [])
   const handleClose = useCallback(() => setSelectedId(null), [])
 
-  // session === undefined → verificando
+  function selectAlbum(albumId: string) {
+    localStorage.setItem('copa_active_album_id', albumId)
+    setActiveAlbumId(albumId)
+  }
+
+  function clearAlbum() {
+    localStorage.removeItem('copa_active_album_id')
+    setActiveAlbumId(null)
+  }
+
   if (session === undefined) return <LoadingSpinner />
-
-  // não autenticado
   if (!session) return <LoginScreen />
-
-  // perfil carregando
   if (profile.isLoading) return <LoadingSpinner />
-
-  // sem username → onboarding
   if (profile.data === null || profile.data === undefined) {
-    if (profile.data === null) {
-      return <OnboardingScreen onComplete={() => profile.refetch()} />
-    }
+    if (profile.data === null) return <OnboardingScreen onComplete={() => profile.refetch()} />
     return <LoadingSpinner />
   }
 
   const username = profile.data.username
 
+  if (albums.isLoading) return <LoadingSpinner />
+
+  // No active album or invalid activeAlbumId → placeholder (will be replaced in Task 5)
+  if (!activeAlbum) {
+    return (
+      <div style={{
+        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24,
+      }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, color: 'var(--green)' }}>
+          COPA 2026
+        </div>
+        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>@{username}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 320 }}>
+          {(albums.data ?? []).map((a) => (
+            <button
+              key={a.id}
+              onClick={() => selectAlbum(a.id)}
+              style={{
+                padding: '14px 16px', borderRadius: 14, background: 'var(--surface)',
+                border: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}
+            >
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{a.name}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {a.progress.obtained}/{a.progress.total}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 600, margin: '0 auto' }}>
-
-      {/* ─── Sticky header ─── */}
       <div style={{ position: 'sticky', top: 0, zIndex: 30 }}>
-        {/* Logo bar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px',
-          background: 'var(--surface)',
-          borderBottom: '1px solid var(--border)',
-          borderTop: '3px solid var(--green)',
+          padding: '10px 16px', background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)', borderTop: '3px solid var(--green)',
         }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, minWidth: 60 }}>
-            @{username}
-          </div>
-          <div style={{
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: 26, letterSpacing: '0.06em', color: 'var(--text)', lineHeight: 1,
-          }}>
-            COPA <span style={{ color: 'var(--green)' }}>2026</span>
-          </div>
           <button
-            onClick={() => supabaseBrowser.auth.signOut()}
-            title="Sair"
+            onClick={clearAlbum}
             style={{
               width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-dim)', fontSize: 18, borderRadius: 8, minWidth: 32,
+              color: 'var(--text-muted)', fontSize: 20, borderRadius: 8, minWidth: 32,
             }}
+            title="Voltar aos álbuns"
           >
-            ⎋
+            ←
           </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              COPA 2026
+            </div>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: '0.04em', color: 'var(--text)', lineHeight: 1 }}>
+              {activeAlbum.name}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 32, justifyContent: 'flex-end' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>@{username}</span>
+          </div>
         </div>
 
-        {/* Tabs */}
         <TabBar activeTab={activeTab} onChange={setActiveTab} />
 
-        {/* Album-only header content */}
         {activeTab === 'album' && (
           <>
-            <ProgressPanel />
+            <ProgressPanel albumId={activeAlbumId!} />
             <FilterBar
               activeSection={activeSection}
               search={search}
@@ -144,7 +185,6 @@ export function AlbumApp() {
         )}
       </div>
 
-      {/* ─── Content ─── */}
       <div style={{ flex: 1, paddingTop: activeTab === 'album' ? 16 : 0 }}>
         {activeTab === 'album' ? (
           isLoading
@@ -156,13 +196,13 @@ export function AlbumApp() {
                 onAction={handleAction}
               />
         ) : (
-          <RepeatedView username={username} />
+          <RepeatedView albumId={activeAlbumId!} username={username} />
         )}
       </div>
 
-      {/* ─── Action sheet ─── */}
       {selectedId && (
         <ActionSheet
+          albumId={activeAlbumId!}
           stickerId={selectedId}
           status={stickers.find(s => s.id === selectedId)?.status ?? 'missing'}
           quantity={stickers.find(s => s.id === selectedId)?.quantity ?? 0}
