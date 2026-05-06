@@ -13,6 +13,7 @@ import { TabBar, type Tab } from './TabBar'
 import { RepeatedView } from './RepeatedView'
 import { StickerGridSkeleton } from './StickerGridSkeleton'
 import { AlbumSelectionScreen } from './AlbumSelectionScreen'
+import { AlbumMembersSheet } from './AlbumMembersSheet'
 
 function LoadingSpinner() {
   return (
@@ -44,6 +45,7 @@ export function AlbumApp() {
     if (typeof window === 'undefined') return null
     return localStorage.getItem('copa_active_album_id')
   })
+  const [showMembers, setShowMembers] = useState(false)
 
   useEffect(() => {
     supabaseBrowser.auth.getSession().then(({ data }) => setSession(data.session))
@@ -144,7 +146,19 @@ export function AlbumApp() {
               {activeAlbum.name}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 32, justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 60, justifyContent: 'flex-end' }}>
+            {activeAlbum.type === 'shared' && (
+              <button
+                onClick={() => setShowMembers(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', fontSize: 12, padding: '4px 6px', borderRadius: 8,
+                }}
+              >
+                👥 {activeAlbum.memberCount}
+              </button>
+            )}
             <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>@{username}</span>
           </div>
         </div>
@@ -186,6 +200,17 @@ export function AlbumApp() {
           status={stickers.find(s => s.id === selectedId)?.status ?? 'missing'}
           quantity={stickers.find(s => s.id === selectedId)?.quantity ?? 0}
           onClose={handleClose}
+        />
+      )}
+      {showMembers && activeAlbum.type === 'shared' && activeAlbum.inviteCode && (
+        <AlbumMembersSheet
+          albumId={activeAlbumId!}
+          albumName={activeAlbum.name}
+          inviteCode={activeAlbum.inviteCode}
+          isOwner={activeAlbum.role === 'owner'}
+          currentUserId=""
+          onClose={() => setShowMembers(false)}
+          onAlbumLeft={clearAlbum}
         />
       )}
     </div>
