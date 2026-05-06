@@ -106,7 +106,7 @@ export function AlbumSelectionScreen({ albums, username, onSelect, onRefetch }: 
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {albums.map((a) => {
-              const pct = Math.round((a.progress.obtained / a.progress.total) * 100)
+              const pct = a.progress.total > 0 ? Math.round((a.progress.obtained / a.progress.total) * 100) : 0
               return (
                 <button
                   key={a.id}
