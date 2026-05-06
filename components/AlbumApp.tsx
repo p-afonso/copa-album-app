@@ -11,6 +11,7 @@ import { LoginScreen } from './LoginScreen'
 import { OnboardingScreen } from './OnboardingScreen'
 import { TabBar, type Tab } from './TabBar'
 import { RepeatedView } from './RepeatedView'
+import { StickerGridSkeleton } from './StickerGridSkeleton'
 
 function LoadingSpinner() {
   return (
@@ -89,9 +90,6 @@ export function AlbumApp() {
     return <LoadingSpinner />
   }
 
-  // stickers carregando
-  if (isLoading) return <LoadingSpinner />
-
   const username = profile.data.username
 
   return (
@@ -149,12 +147,14 @@ export function AlbumApp() {
       {/* ─── Content ─── */}
       <div style={{ flex: 1, paddingTop: activeTab === 'album' ? 16 : 0 }}>
         {activeTab === 'album' ? (
-          <StickerGrid
-            stickers={stickers}
-            activeSection={activeSection}
-            search={search}
-            onAction={handleAction}
-          />
+          isLoading
+            ? <StickerGridSkeleton />
+            : <StickerGrid
+                stickers={stickers}
+                activeSection={activeSection}
+                search={search}
+                onAction={handleAction}
+              />
         ) : (
           <RepeatedView username={username} />
         )}
