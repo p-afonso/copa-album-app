@@ -6,6 +6,7 @@ type Step = 'form' | 'sent'
 
 export function LoginScreen() {
   const [email, setEmail] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [step, setStep] = useState<Step>('form')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -14,6 +15,10 @@ export function LoginScreen() {
     e.preventDefault()
     setError(null)
     setLoading(true)
+
+    // Salva preferência ANTES do clique no magic link, pois o redirect
+    // é um page reload e o cliente Supabase lê essa key na inicialização.
+    localStorage.setItem('copa_remember_me', rememberMe ? '1' : '0')
 
     const { error } = await supabaseBrowser.auth.signInWithOtp({
       email,
@@ -100,6 +105,21 @@ export function LoginScreen() {
                 onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
               />
+
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                cursor: 'pointer', userSelect: 'none',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: 'var(--green)', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  Lembrar de mim por 30 dias
+                </span>
+              </label>
 
               {error && (
                 <div style={{ fontSize: 13, color: 'var(--red)', padding: '8px 12px', background: '#fef2f2', borderRadius: 8 }}>
