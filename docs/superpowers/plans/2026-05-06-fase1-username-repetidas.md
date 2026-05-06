@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Adicionar username único com onboarding obrigatório, aba dedicada de figurinhas repetidas com remoção unitária (-1), e export CSV com repetidas + faltando.
+**Goal:** Adicionar username único com onboarding obrigatório, aba de repetidas com remoção unitária, export CSV, optimistic updates instantâneos no ActionSheet e skeleton loading no StickerGrid.
 
-**Architecture:** Nova tabela `profiles` (username único) + tRPC router `profile` + tela `OnboardingScreen` bloqueante antes do app + navegação por duas abas (`AlbumApp` → TabBar) + `RepeatedView` com optimistic update + export CSV client-side.
+**Architecture:** Nova tabela `profiles` (username único) + tRPC router `profile` + tela `OnboardingScreen` bloqueante + navegação por duas abas (`AlbumApp` → TabBar) + `RepeatedView` com optimistic update + export CSV client-side + optimistic update no `ActionSheet` (fecha imediato, reverte em erro) + `StickerGridSkeleton` com shimmer.
 
 **Tech Stack:** Next.js 15 App Router, tRPC v11, Supabase (Postgres + RLS), React 19, TypeScript, inline styles (padrão do projeto)
 
@@ -23,6 +23,10 @@
 | Create | `components/TabBar.tsx` | Abas Álbum / Repetidas |
 | Create | `components/RepeatedView.tsx` | Lista de repetidas + botão −1 + export |
 | Modify | `components/AlbumApp.tsx` | Gate de onboarding + tabs + @username no header |
+| Modify | `components/ActionSheet.tsx` | Optimistic update: fecha imediato + reverte em erro |
+| Create | `components/StickerGridSkeleton.tsx` | Skeleton com shimmer para loading do grid |
+| Modify | `components/AlbumApp.tsx` (2ª passagem) | Usar StickerGridSkeleton em vez do spinner de loading |
+| Modify | `app/globals.css` | Adicionar animação shimmer |
 
 ---
 
@@ -897,4 +901,224 @@ Testar o fluxo completo:
 ```bash
 git add components/AlbumApp.tsx
 git commit -m "feat: AlbumApp — onboarding gate, tabs álbum/repetidas, @username no header"
+```
+
+---
+
+## Task 9: Optimistic update no ActionSheet
+
+**Files:**
+- Modify: `components/ActionSheet.tsx`
+
+Substituir o bloco `useMutation` atual (linhas 16–23) pelo código abaixo. A mudança central: o ActionSheet fecha **imediatamente** em `onMutate` e já atualiza o cache local — o servidor confirma de forma assíncrona. Se o servidor falhar, o cache reverte.
+
+- [ ] **Substituir o `useMutation` em `components/ActionSheet.tsx`**
+
+Substituir:
+```typescript
+  const update = trpc.stickers.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.stickers.list.invalidate()
+      utils.stickers.getProgress.invalidate()
+      utils.stickers.listDuplicates.invalidate()
+      onClose()
+    },
+  })
+```
+
+Por:
+```typescript
+  const update = trpc.stickers.updateStatus.useMutation({
+    onMutate: async ({ stickerId, status, quantity }) => {
+      onClose()
+      await utils.stickers.list.cancel()
+      const prev = utils.stickers.list.getData()
+      utils.stickers.list.setData(undefined, (old) =>
+        old?.map((s) => {
+          if (s.id !== stickerId) return s
+          const newQty =
+            status === 'repeated' ? (quantity ?? 2)
+            : status === 'obtained' ? 1
+            : 0
+          return { ...s, status, quantity: newQty }
+        }),
+      )
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) utils.stickers.list.setData(undefined, ctx.prev)
+    },
+    onSettled: () => {
+      utils.stickers.list.invalidate()
+      utils.stickers.getProgress.invalidate()
+      utils.stickers.listDuplicates.invalidate()
+    },
+  })
+```
+
+- [ ] **Verificar comportamento no dev server**
+
+```bash
+npm run dev
+```
+
+1. Marcar uma figurinha como "obtida" → ActionSheet fecha instantaneamente, card muda de cor sem esperar resposta do servidor
+2. Marcar como "repetida" → mesmo comportamento
+3. Remover → mesmo comportamento
+
+- [ ] **Commit**
+
+```bash
+git add components/ActionSheet.tsx
+git commit -m "feat: ActionSheet — optimistic update, UI atualiza instantaneamente"
+```
+
+---
+
+## Task 10: Skeleton loading no StickerGrid
+
+**Files:**
+- Create: `components/StickerGridSkeleton.tsx`
+- Modify: `app/globals.css`
+- Modify: `components/AlbumApp.tsx`
+
+O objetivo é substituir o spinner full-screen durante o carregamento das figurinhas por um skeleton que preserva o layout do app — o usuário já vê a estrutura antes dos dados chegarem.
+
+- [ ] **Adicionar animação shimmer em `app/globals.css`**
+
+Adicionar ao final do arquivo:
+```css
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--border) 50%,
+    var(--surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+```
+
+- [ ] **Criar `components/StickerGridSkeleton.tsx`**
+
+```typescript
+export function StickerGridSkeleton() {
+  const fakeTeams = [
+    { section: 'Grupo A', teams: ['MEX', 'RSA', 'KOR', 'CZE'] },
+    { section: 'Grupo B', teams: ['CAN', 'BIH', 'QAT', 'SUI'] },
+    { section: 'Grupo C', teams: ['BRA', 'MAR', 'HAI', 'SCO'] },
+  ]
+
+  return (
+    <div style={{ paddingBottom: 32 }}>
+      {fakeTeams.map((sec) => (
+        <div key={sec.section} style={{ marginBottom: 24 }}>
+          {/* Section header skeleton */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '12px 16px 8px',
+          }}>
+            <div style={{ width: 3, height: 18, borderRadius: 99, background: 'var(--border)' }} />
+            <div className="skeleton-shimmer" style={{ width: 80, height: 18, borderRadius: 6 }} />
+            <div style={{ flex: 1, height: 1, background: 'var(--border)', marginLeft: 4 }} />
+          </div>
+
+          {sec.teams.map((code) => (
+            <div key={code} style={{ padding: '0 12px', marginBottom: 14 }}>
+              {/* Team header skeleton */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div className="skeleton-shimmer" style={{ width: 36, height: 18, borderRadius: 5 }} />
+                <div className="skeleton-shimmer" style={{ width: 100, height: 14, borderRadius: 4 }} />
+              </div>
+
+              {/* Progress bar skeleton */}
+              <div style={{
+                height: 3, background: 'var(--border)', borderRadius: 99, marginBottom: 7,
+              }} />
+
+              {/* Card grid skeleton — 7 cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, 1fr)',
+                gap: 4,
+              }}>
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="skeleton-shimmer"
+                    style={{ aspectRatio: '1', borderRadius: 8 }}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+- [ ] **Atualizar `components/AlbumApp.tsx` — trocar o spinner de stickers pelo skeleton**
+
+Na seção `{/* ─── Content ─── */}`, substituir:
+```typescript
+      <div style={{ flex: 1, paddingTop: activeTab === 'album' ? 16 : 0 }}>
+        {activeTab === 'album' ? (
+          <StickerGrid
+            stickers={stickers}
+            activeSection={activeSection}
+            search={search}
+            onAction={handleAction}
+          />
+        ) : (
+          <RepeatedView username={username} />
+        )}
+      </div>
+```
+
+Por:
+```typescript
+      <div style={{ flex: 1, paddingTop: activeTab === 'album' ? 16 : 0 }}>
+        {activeTab === 'album' ? (
+          isLoading
+            ? <StickerGridSkeleton />
+            : <StickerGrid
+                stickers={stickers}
+                activeSection={activeSection}
+                search={search}
+                onAction={handleAction}
+              />
+        ) : (
+          <RepeatedView username={username} />
+        )}
+      </div>
+```
+
+E remover o bloco `if (isLoading) return <LoadingSpinner />` que existia antes do `return` principal (o spinner full-screen de stickers não é mais necessário — o skeleton substitui).
+
+Também adicionar o import no topo do arquivo:
+```typescript
+import { StickerGridSkeleton } from './StickerGridSkeleton'
+```
+
+- [ ] **Verificar no dev server**
+
+```bash
+npm run dev
+```
+
+1. Com conexão lenta (DevTools → Network → Slow 3G), ao carregar o app deve aparecer o skeleton com shimmer no lugar do grid, sem o spinner full-screen
+2. Quando os dados chegarem, o skeleton é substituído pelo grid real
+
+- [ ] **Commit**
+
+```bash
+git add app/globals.css components/StickerGridSkeleton.tsx components/AlbumApp.tsx
+git commit -m "feat: skeleton loading no StickerGrid com animação shimmer"
 ```
