@@ -15,6 +15,8 @@ create table album_members (
   primary key (album_id, user_id)
 );
 
+create index album_members_user_id_idx on album_members (user_id);
+
 create table album_stickers (
   album_id   uuid not null references albums(id) on delete cascade,
   sticker_id text not null,
@@ -35,7 +37,7 @@ create policy "albums_select" on albums
   );
 
 create policy "albums_insert" on albums
-  for insert with check (auth.role() = 'authenticated');
+  for insert with check (auth.role() = 'authenticated' and owner_id = auth.uid());
 
 create policy "albums_update" on albums
   for update using (owner_id = auth.uid());
@@ -54,7 +56,7 @@ create policy "album_members_select" on album_members
 create policy "album_members_insert" on album_members
   for insert with check (
     exists (select 1 from albums where id = album_id and owner_id = auth.uid())
-    or user_id = auth.uid()
+    or (user_id = auth.uid() and role = 'member')
   );
 
 create policy "album_members_delete" on album_members
@@ -71,3 +73,5 @@ create policy "album_stickers_all" on album_stickers
   with check (
     exists (select 1 from album_members where album_id = album_stickers.album_id and user_id = auth.uid())
   );
+
+alter publication supabase_realtime add table album_stickers;
