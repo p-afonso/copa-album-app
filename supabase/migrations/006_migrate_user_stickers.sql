@@ -1,3 +1,5 @@
+begin;
+
 -- Create personal albums for every user who has stickers, migrate their data.
 do $$
 declare
@@ -19,4 +21,6 @@ begin
   end loop;
 end $$;
 
-drop table user_stickers;
+drop table user_stickers cascade;
+
+commit;
