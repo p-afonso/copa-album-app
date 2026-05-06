@@ -1,0 +1,4 @@
+-- Seed gerado a partir de sticker-data.ts
+-- Execute este script após a migration 001
+-- Para gerar o SQL completo, rode: npx tsx scripts/generate-seed.ts
+-- (veja scripts/generate-seed.ts)
