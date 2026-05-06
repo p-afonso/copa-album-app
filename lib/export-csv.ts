@@ -8,7 +8,7 @@ type StickerEntry = {
 
 function csvRow(fields: string[]): string {
   return fields
-    .map((f) => (f.includes(',') || f.includes('"') ? `"${f.replace(/"/g, '""')}"` : f))
+    .map((f) => (f.includes(',') || f.includes('"') || f.includes('\n') || f.includes('\r') ? `"${f.replace(/"/g, '""')}"` : f))
     .join(',')
 }
 
