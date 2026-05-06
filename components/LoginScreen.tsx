@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase-client'
 
-type Mode = 'login' | 'register'
+type Mode = 'login' | 'register' | 'forgot'
 
 export function LoginScreen() {
   const [mode, setMode] = useState<Mode>('login')
@@ -25,17 +25,31 @@ export function LoginScreen() {
     e.preventDefault()
     setError(null)
     setSuccess(null)
+    setLoading(true)
+
+    if (mode === 'forgot') {
+      const { error } = await supabaseBrowser.auth.resetPasswordForEmail(email, {
+        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      })
+      if (error) {
+        setError(translateError(error.message))
+      } else {
+        setSuccess('Link enviado! Verifique seu e-mail para definir a senha.')
+      }
+      setLoading(false)
+      return
+    }
 
     if (mode === 'register' && password !== confirmPassword) {
       setError('As senhas não coincidem.')
+      setLoading(false)
       return
     }
     if (password.length < 6) {
       setError('A senha deve ter pelo menos 6 caracteres.')
+      setLoading(false)
       return
     }
-
-    setLoading(true)
 
     if (mode === 'login') {
       const { error } = await supabaseBrowser.auth.signInWithPassword({ email, password })
@@ -106,113 +120,145 @@ export function LoginScreen() {
         borderRadius: 16,
         padding: '24px 24px 28px',
       }}>
-        {/* Mode tabs */}
-        <div style={{
-          display: 'flex',
-          background: 'var(--bg)',
-          borderRadius: 10,
-          padding: 4,
-          marginBottom: 24,
-        }}>
-          {(['login', 'register'] as Mode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => switchMode(m)}
-              style={{
-                flex: 1,
-                padding: '8px 0',
-                borderRadius: 7,
-                border: 'none',
-                background: mode === m ? 'var(--surface)' : 'transparent',
-                color: mode === m ? 'var(--text)' : 'var(--text-muted)',
-                fontSize: 14,
-                fontWeight: mode === m ? 600 : 400,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: 'all 0.15s',
-                boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
-              }}
-            >
-              {m === 'login' ? 'Entrar' : 'Cadastrar'}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <input
-            type="email"
-            placeholder="seu@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={inputStyle}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
-          />
-
-          <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={inputStyle}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
-          />
-
-          {mode === 'register' && (
+        {mode === 'forgot' ? (
+          /* ── Esqueci a senha ── */
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 4 }}>
+              Informe seu e-mail e enviaremos um link para você definir uma nova senha.
+            </div>
             <input
-              type="password"
-              placeholder="Confirmar senha"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               style={inputStyle}
               onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
               onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
             />
-          )}
-
-          {error && (
+            {error && (
+              <div style={{ fontSize: 13, color: 'var(--red)', padding: '8px 12px', background: '#fef2f2', borderRadius: 8 }}>
+                {error}
+              </div>
+            )}
+            {success && (
+              <div style={{ fontSize: 13, color: 'var(--green)', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8 }}>
+                {success}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={loading || !email}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+                background: loading || !email ? 'var(--border)' : 'var(--green)',
+                color: loading || !email ? 'var(--text-muted)' : '#fff',
+                fontSize: 15, fontWeight: 600, cursor: loading || !email ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', marginTop: 4,
+              }}
+            >
+              {loading ? 'Enviando…' : 'Enviar link'}
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              ← Voltar ao login
+            </button>
+          </form>
+        ) : (
+          <>
+            {/* Mode tabs */}
             <div style={{
-              fontSize: 13, color: 'var(--red)',
-              padding: '8px 12px', background: '#fef2f2', borderRadius: 8,
+              display: 'flex', background: 'var(--bg)', borderRadius: 10, padding: 4, marginBottom: 24,
             }}>
-              {error}
+              {(['login', 'register'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => switchMode(m)}
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 7, border: 'none',
+                    background: mode === m ? 'var(--surface)' : 'transparent',
+                    color: mode === m ? 'var(--text)' : 'var(--text-muted)',
+                    fontSize: 14, fontWeight: mode === m ? 600 : 400,
+                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                    boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+                  }}
+                >
+                  {m === 'login' ? 'Entrar' : 'Cadastrar'}
+                </button>
+              ))}
             </div>
-          )}
 
-          {success && (
-            <div style={{
-              fontSize: 13, color: 'var(--green)',
-              padding: '8px 12px', background: '#f0fdf4', borderRadius: 8,
-            }}>
-              {success}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isDisabled}
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: 10,
-              border: 'none',
-              background: isDisabled ? 'var(--border)' : 'var(--green)',
-              color: isDisabled ? 'var(--text-muted)' : '#fff',
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: isDisabled ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit',
-              transition: 'background 0.15s',
-              marginTop: 4,
-            }}
-          >
-            {loading ? (mode === 'login' ? 'Entrando…' : 'Criando conta…') : (mode === 'login' ? 'Entrar' : 'Criar conta')}
-          </button>
-        </form>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+              />
+              <input
+                type="password"
+                placeholder="Senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={inputStyle}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+              />
+              {mode === 'register' && (
+                <input
+                  type="password"
+                  placeholder="Confirmar senha"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  style={inputStyle}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--green)' }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                />
+              )}
+              {error && (
+                <div style={{ fontSize: 13, color: 'var(--red)', padding: '8px 12px', background: '#fef2f2', borderRadius: 8 }}>
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div style={{ fontSize: 13, color: 'var(--green)', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8 }}>
+                  {success}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={isDisabled}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+                  background: isDisabled ? 'var(--border)' : 'var(--green)',
+                  color: isDisabled ? 'var(--text-muted)' : '#fff',
+                  fontSize: 15, fontWeight: 600, cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit', transition: 'background 0.15s', marginTop: 4,
+                }}
+              >
+                {loading ? (mode === 'login' ? 'Entrando…' : 'Criando conta…') : (mode === 'login' ? 'Entrar' : 'Criar conta')}
+              </button>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('forgot')}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}
+                >
+                  Esqueci a senha
+                </button>
+              )}
+            </form>
+          </>
+        )}
       </div>
     </div>
   )

@@ -14,6 +14,7 @@ import { RepeatedView } from './RepeatedView'
 import { StickerGridSkeleton } from './StickerGridSkeleton'
 import { AlbumSelectionScreen } from './AlbumSelectionScreen'
 import { AlbumMembersSheet } from './AlbumMembersSheet'
+import { SetPasswordScreen } from './SetPasswordScreen'
 
 function LoadingSpinner() {
   return (
@@ -46,10 +47,14 @@ export function AlbumApp() {
     return localStorage.getItem('copa_active_album_id')
   })
   const [showMembers, setShowMembers] = useState(false)
+  const [isRecovery, setIsRecovery] = useState(false)
 
   useEffect(() => {
     supabaseBrowser.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: { subscription } } = supabaseBrowser.auth.onAuthStateChange((_, s) => setSession(s))
+    const { data: { subscription } } = supabaseBrowser.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setIsRecovery(true)
+      setSession(s)
+    })
     return () => subscription.unsubscribe()
   }, [])
 
@@ -97,6 +102,7 @@ export function AlbumApp() {
   }
 
   if (session === undefined) return <LoadingSpinner />
+  if (isRecovery) return <SetPasswordScreen onDone={() => setIsRecovery(false)} />
   if (!session) return <LoginScreen />
   if (profile.isLoading) return <LoadingSpinner />
   if (profile.data === null || profile.data === undefined) {
