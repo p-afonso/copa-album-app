@@ -113,11 +113,19 @@ export const albumsRouter = router({
   rename: protectedProcedure
     .input(z.object({ albumId: z.string().uuid(), name: z.string().min(1).max(50) }))
     .mutation(async ({ ctx, input }) => {
+      const { data: album } = await supabaseAdmin
+        .from('albums')
+        .select('owner_id')
+        .eq('id', input.albumId)
+        .maybeSingle()
+
+      if (!album || album.owner_id !== ctx.userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Somente o dono pode renomear o álbum' })
+
       const { error } = await supabaseAdmin
         .from('albums')
         .update({ name: input.name })
         .eq('id', input.albumId)
-        .eq('owner_id', ctx.userId)
 
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       return { success: true }
@@ -126,14 +134,24 @@ export const albumsRouter = router({
   regenerateCode: protectedProcedure
     .input(z.object({ albumId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      const { data: album } = await supabaseAdmin
+        .from('albums')
+        .select('owner_id, type')
+        .eq('id', input.albumId)
+        .maybeSingle()
+
+      if (!album || album.owner_id !== ctx.userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Somente o dono pode regenerar o código' })
+
+      if (album.type !== 'shared')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Apenas álbuns compartilhados têm código de convite' })
+
       const newCode = generateInviteCode()
 
       const { error } = await supabaseAdmin
         .from('albums')
         .update({ invite_code: newCode })
         .eq('id', input.albumId)
-        .eq('owner_id', ctx.userId)
-        .eq('type', 'shared')
 
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       return { inviteCode: newCode }
@@ -230,11 +248,19 @@ export const albumsRouter = router({
   delete: protectedProcedure
     .input(z.object({ albumId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      const { data: album } = await supabaseAdmin
+        .from('albums')
+        .select('owner_id')
+        .eq('id', input.albumId)
+        .maybeSingle()
+
+      if (!album || album.owner_id !== ctx.userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Somente o dono pode deletar o álbum' })
+
       const { error } = await supabaseAdmin
         .from('albums')
         .delete()
         .eq('id', input.albumId)
-        .eq('owner_id', ctx.userId)
 
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       return { success: true }
