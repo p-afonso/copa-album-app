@@ -265,4 +265,30 @@ export const albumsRouter = router({
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       return { success: true }
     }),
+
+  convertToShared: protectedProcedure
+    .input(z.object({ albumId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { data: album } = await supabaseAdmin
+        .from('albums')
+        .select('owner_id, type')
+        .eq('id', input.albumId)
+        .maybeSingle()
+
+      if (!album || album.owner_id !== ctx.userId)
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Somente o dono pode compartilhar o álbum' })
+
+      if (album.type === 'shared')
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Álbum já é compartilhado' })
+
+      const invite_code = generateInviteCode()
+
+      const { error } = await supabaseAdmin
+        .from('albums')
+        .update({ type: 'shared', invite_code })
+        .eq('id', input.albumId)
+
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      return { inviteCode: invite_code }
+    }),
 })

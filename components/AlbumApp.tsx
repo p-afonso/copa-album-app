@@ -72,6 +72,13 @@ export function AlbumApp() {
   )
   const utils = trpc.useUtils()
 
+  const convertToShared = trpc.albums.convertToShared.useMutation({
+    onSuccess: () => {
+      utils.albums.list.invalidate()
+      setShowMembers(true)
+    },
+  })
+
   useEffect(() => {
     if (!session || !activeAlbumId) return
     const channel = supabaseBrowser
@@ -152,8 +159,8 @@ export function AlbumApp() {
               {activeAlbum.name}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 60, justifyContent: 'flex-end' }}>
-            {activeAlbum.type === 'shared' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 60, justifyContent: 'flex-end' }}>
+            {activeAlbum.type === 'shared' ? (
               <button
                 onClick={() => setShowMembers(true)}
                 style={{
@@ -164,7 +171,21 @@ export function AlbumApp() {
               >
                 👥 {activeAlbum.memberCount}
               </button>
-            )}
+            ) : activeAlbum.role === 'owner' ? (
+              <button
+                onClick={() => convertToShared.mutate({ albumId: activeAlbumId! })}
+                disabled={convertToShared.isPending}
+                title="Compartilhar álbum"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'none', border: 'none', cursor: convertToShared.isPending ? 'not-allowed' : 'pointer',
+                  color: 'var(--text-muted)', fontSize: 16, padding: '4px 6px', borderRadius: 8,
+                  opacity: convertToShared.isPending ? 0.5 : 1,
+                }}
+              >
+                🔗
+              </button>
+            ) : null}
             <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>@{username}</span>
           </div>
         </div>
