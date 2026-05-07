@@ -1,5 +1,5 @@
 'use client'
-import { StickerCard } from './StickerCard'
+import { StickerCard, type QuickActionType } from './StickerCard'
 import type { StickerDef } from '@/lib/sticker-data'
 import { SECTIONS } from '@/lib/sticker-data'
 
@@ -8,14 +8,19 @@ type StickerWithStatus = StickerDef & {
   quantity: number
 }
 
+type StatusFilter = 'all' | 'missing' | 'obtained' | 'repeated'
+
 type Props = {
   stickers: StickerWithStatus[]
   activeSection: string
   search: string
   onAction: (id: string) => void
+  quickMode?: boolean
+  onQuickAction?: (id: string, action: QuickActionType) => void
+  statusFilter?: StatusFilter
 }
 
-export function StickerGrid({ stickers, activeSection, search, onAction }: Props) {
+export function StickerGrid({ stickers, activeSection, search, onAction, quickMode, onQuickAction, statusFilter = 'all' }: Props) {
   const filtered = stickers.filter((s) => {
     const matchSection = activeSection === 'all' || s.section === activeSection
     const q = search.toLowerCase()
@@ -24,7 +29,8 @@ export function StickerGrid({ stickers, activeSection, search, onAction }: Props
       s.id.toLowerCase().includes(q) ||
       s.countryName.toLowerCase().includes(q) ||
       s.number.includes(q)
-    return matchSection && matchSearch
+    const matchStatus = statusFilter === 'all' || s.status === statusFilter
+    return matchSection && matchSearch && matchStatus
   })
 
   const sections =
@@ -92,15 +98,25 @@ export function StickerGrid({ stickers, activeSection, search, onAction }: Props
               const obtained = teamStickers.filter((s) => s.status !== 'missing').length
               const pct = Math.round((obtained / teamStickers.length) * 100)
               const isComplete = pct === 100
+              const isEmpty = pct === 0
 
               return (
-                <div key={team.code} style={{ padding: '0 12px', marginBottom: 14 }}>
+                <div key={team.code} style={{
+                  padding: '0 12px', marginBottom: 14,
+                  opacity: isEmpty ? 0.5 : 1,
+                  transition: 'opacity 0.3s ease',
+                }}>
                   {/* Team header */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
                     marginBottom: 6,
+                    background: isComplete ? 'var(--gold-glow)' : 'transparent',
+                    borderBottom: isComplete ? '1px solid rgba(180,83,9,0.4)' : 'none',
+                    borderRadius: isComplete ? 6 : 0,
+                    padding: isComplete ? '4px 6px' : '0',
+                    margin: isComplete ? '0 -6px 6px' : '0 0 6px',
                   }}>
                     <span style={{
                       fontFamily: "'Bebas Neue', sans-serif",
@@ -116,23 +132,40 @@ export function StickerGrid({ stickers, activeSection, search, onAction }: Props
                     </span>
                     <span style={{
                       fontSize: 12,
-                      color: 'var(--text-muted)',
+                      color: isComplete ? 'var(--gold-mid)' : 'var(--text-muted)',
                       flex: 1,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
-                      fontWeight: 500,
+                      fontWeight: isComplete ? 600 : 500,
                     }}>
                       {team.name}
                     </span>
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: isComplete ? 'var(--green)' : 'var(--text-dim)',
-                      flexShrink: 0,
-                    }}>
-                      {obtained}/{teamStickers.length}
-                    </span>
+                    {isComplete && (
+                      <span
+                        className="team-complete-badge"
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: 'var(--gold-mid)',
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          flexShrink: 0,
+                        }}
+                      >
+                        ✦ Completo
+                      </span>
+                    )}
+                    {!isComplete && (
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--text-dim)',
+                        flexShrink: 0,
+                      }}>
+                        {obtained}/{teamStickers.length}
+                      </span>
+                    )}
                   </div>
 
                   {/* Mini progress bar */}
@@ -143,15 +176,18 @@ export function StickerGrid({ stickers, activeSection, search, onAction }: Props
                     marginBottom: 7,
                     overflow: 'hidden',
                   }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${pct}%`,
-                      background: isComplete
-                        ? 'linear-gradient(90deg, #22c55e, #15803d)'
-                        : 'linear-gradient(90deg, #86efac, #22c55e)',
-                      borderRadius: 99,
-                      transition: 'width 0.5s ease',
-                    }} />
+                    <div
+                      className={pct >= 80 ? 'progress-glow' : ''}
+                      style={{
+                        height: '100%',
+                        width: `${pct}%`,
+                        background: isComplete
+                          ? 'linear-gradient(90deg, #22c55e, #15803d)'
+                          : 'linear-gradient(90deg, #86efac, #22c55e)',
+                        borderRadius: 99,
+                        transition: 'width 0.5s ease',
+                      }}
+                    />
                   </div>
 
                   {/* Card grid */}
@@ -168,6 +204,8 @@ export function StickerGrid({ stickers, activeSection, search, onAction }: Props
                         status={s.status}
                         quantity={s.quantity}
                         onAction={onAction}
+                        quickMode={quickMode}
+                        onQuickAction={onQuickAction}
                       />
                     ))}
                   </div>
