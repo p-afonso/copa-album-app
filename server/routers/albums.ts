@@ -11,13 +11,13 @@ function generateInviteCode(): string {
   ).join('')
 }
 
-type AlbumRow = { id: string; name: string; type: string; invite_code: string | null }
+type AlbumRow = { id: string; name: string; type: string; invite_code: string | null; marketplace_visible: boolean }
 
 export const albumsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const { data: memberships, error } = await supabaseAdmin
       .from('album_members')
-      .select('album_id, role, albums(id, name, type, invite_code)')
+      .select('album_id, role, albums(id, name, type, invite_code, marketplace_visible)')
       .eq('user_id', ctx.userId)
 
     if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
@@ -47,6 +47,7 @@ export const albumsRouter = router({
           role: m.role as 'owner' | 'member',
           inviteCode: album.invite_code,
           memberCount: memberCount ?? 0,
+          marketplaceVisible: album.marketplace_visible,
           progress: { obtained, total },
         }
       }),
