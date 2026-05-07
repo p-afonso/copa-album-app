@@ -1,5 +1,6 @@
 'use client'
 import { trpc } from '@/lib/trpc'
+import { useCountUp } from '@/hooks/useCountUp'
 
 type Props = { albumId: string }
 
@@ -12,6 +13,11 @@ export function ProgressPanel({ albumId }: Props) {
   const filled = obtained + repeated
   const pct = Math.round((filled / total) * 100)
   const missing = data?.missing ?? total
+
+  const displayedFilled = useCountUp(filled)
+  const displayedObtained = useCountUp(obtained)
+  const displayedRepeated = useCountUp(repeated)
+  const displayedMissing = useCountUp(missing)
 
   return (
     <div style={{
@@ -29,7 +35,7 @@ export function ProgressPanel({ albumId }: Props) {
           <span style={{
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: 38, lineHeight: 1, color: 'var(--text)', letterSpacing: '0.01em',
-          }}>{filled}</span>
+          }}>{displayedFilled}</span>
           <span style={{ fontSize: 13, color: 'var(--text-dim)', fontWeight: 500, paddingBottom: 2 }}>
             / {total}
           </span>
@@ -55,16 +61,18 @@ export function ProgressPanel({ albumId }: Props) {
           style={{
             height: '100%', width: `${pct}%`,
             background: 'linear-gradient(90deg, #22c55e 0%, #15803d 100%)',
-            borderRadius: 99, transition: 'width 0.7s ease', minWidth: pct > 0 ? 8 : 0,
+            borderRadius: 99,
+            transition: 'width 0.6s cubic-bezier(0.34, 1.2, 0.64, 1)',
+            minWidth: pct > 0 ? 8 : 0,
           }}
         />
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <Chip value={missing} label="faltando" bg="var(--surface-2)" border="var(--border)" valueColor="var(--text)" />
-        <Chip value={obtained} label="obtidas" bg="#dcfce7" border="#bbf7d0" valueColor="var(--green-mid, #15803d)" />
+        <Chip value={displayedMissing} label="faltando" bg="var(--surface-2)" border="var(--border)" valueColor="var(--text)" />
+        <Chip value={displayedObtained} label="obtidas" bg="#dcfce7" border="#bbf7d0" valueColor="var(--green-mid, #15803d)" />
         {repeated > 0 && (
-          <Chip value={repeated} label="repetidas" bg="#fef3c7" border="#fde68a" valueColor="var(--gold-mid, #b45309)" />
+          <Chip value={displayedRepeated} label="repetidas" bg="#fef3c7" border="#fde68a" valueColor="var(--gold-mid, #b45309)" />
         )}
       </div>
     </div>
