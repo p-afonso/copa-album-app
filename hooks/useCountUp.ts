@@ -15,16 +15,15 @@ export function useCountUp(target: number, duration = 600) {
       if (cancelled) return
       const elapsed = now - startTime
       const progress = Math.min(elapsed / duration, 1)
-      setDisplayed(Math.round(from + (target - from) * progress))
+      const current = Math.round(from + (target - from) * progress)
+      prevRef.current = current
+      setDisplayed(current)
       if (progress < 1) requestAnimationFrame(tick)
       else prevRef.current = target
     }
 
     requestAnimationFrame(tick)
-    return () => {
-      cancelled = true
-      prevRef.current = target
-    }
+    return () => { cancelled = true }
   }, [target, duration])
 
   return displayed
