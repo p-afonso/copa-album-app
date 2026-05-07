@@ -1,6 +1,7 @@
 'use client'
 import { trpc } from '@/lib/trpc'
 import { generateCSV } from '@/lib/export-csv'
+import { EmptyState } from './EmptyState'
 
 type Props = { albumId: string; username: string }
 
@@ -37,13 +38,11 @@ export function RepeatedView({ albumId, username }: Props) {
 
   if (repeated.length === 0) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', padding: '80px 24px', gap: 8, textAlign: 'center',
-      }}>
-        <div style={{ fontSize: 36, opacity: 0.4 }}>✓</div>
-        <div style={{ fontSize: 15, color: 'var(--text-muted)' }}>Nenhuma figurinha repetida</div>
-      </div>
+      <EmptyState
+        icon="📦"
+        title="Tudo único por aqui"
+        subtitle="Quando você tiver figurinhas repetidas, elas aparecem aqui para trocar."
+      />
     )
   }
 

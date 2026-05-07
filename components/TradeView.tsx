@@ -93,7 +93,15 @@ export function TradeView({ albumId, userId, marketplaceVisible }: Props) {
       </div>
 
       {subTab === 'marketplace'
-        ? <MarketplaceTab albumId={albumId} userId={userId} />
+        ? <MarketplaceTab
+            albumId={albumId}
+            userId={userId}
+            onActivateMarketplace={
+              !marketplaceVisible
+                ? () => setVisibility.mutate({ albumId, visible: true })
+                : undefined
+            }
+          />
         : <ProposalsTab proposals={proposals} />
       }
     </div>

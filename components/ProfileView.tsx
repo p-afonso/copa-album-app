@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { trpc } from '@/lib/trpc'
 import { supabaseBrowser } from '@/lib/supabase-client'
+import { EmptyState } from './EmptyState'
 
 type Props = { username: string; onUsernameChange: () => void }
 
@@ -247,7 +248,11 @@ export function ProfileView({ username, onUsernameChange }: Props) {
           Histórico de trocas ({history.length})
         </div>
         {history.length === 0 ? (
-          <div style={{ padding: '16px 0', fontSize: 14, color: 'var(--text-dim)' }}>Nenhuma troca realizada ainda</div>
+          <EmptyState
+            icon="🤝"
+            title="Nenhuma troca concluída"
+            subtitle="Suas trocas aceitas aparecem aqui com o contato da outra pessoa."
+          />
         ) : (
           history.map(h => (
             <div key={h.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>

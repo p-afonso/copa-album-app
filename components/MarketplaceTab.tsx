@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { trpc } from '@/lib/trpc'
 import { TradeProposalSheet } from './TradeProposalSheet'
+import { EmptyState } from './EmptyState'
 
 type MarketplaceEntry = {
   stickerId: string
@@ -12,9 +13,13 @@ type MarketplaceEntry = {
   albumId: string
 }
 
-type Props = { albumId: string; userId: string }
+type Props = {
+  albumId: string
+  userId: string
+  onActivateMarketplace?: () => void
+}
 
-export function MarketplaceTab({ albumId, userId: _userId }: Props) {
+export function MarketplaceTab({ albumId, userId: _userId, onActivateMarketplace }: Props) {
   const { data, isLoading } = trpc.trades.getMarketplace.useQuery()
   const [proposalTarget, setProposalTarget] = useState<MarketplaceEntry | null>(null)
   const [activeBoard, setActiveBoard] = useState<'offering' | 'wanting'>('offering')
@@ -33,14 +38,12 @@ export function MarketplaceTab({ albumId, userId: _userId }: Props) {
 
   if (isEmpty) {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', padding: '80px 24px', gap: 8, textAlign: 'center',
-      }}>
-        <div style={{ fontSize: 36, opacity: 0.4 }}>🌐</div>
-        <div style={{ fontSize: 15, color: 'var(--text-muted)' }}>Nenhum álbum visível no marketplace</div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Ative a visibilidade no seu álbum e convide outros usuários</div>
-      </div>
+      <EmptyState
+        icon="🌐"
+        title="Ninguém no mercado ainda"
+        subtitle="Ative sua visibilidade e convide amigos para começar a trocar."
+        action={onActivateMarketplace ? { label: 'Ativar agora →', onClick: onActivateMarketplace } : undefined}
+      />
     )
   }
 
