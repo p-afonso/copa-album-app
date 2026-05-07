@@ -13,10 +13,10 @@ export const profileRouter = router({
   get: protectedProcedure.query(async ({ ctx }) => {
     const { data } = await supabaseAdmin
       .from('profiles')
-      .select('username')
+      .select('username, phone')
       .eq('user_id', ctx.userId)
       .maybeSingle()
-    return data ? { username: data.username } : null
+    return data ? { username: data.username, phone: (data.phone as string | null) ?? null } : null
   }),
 
   checkUsername: protectedProcedure
@@ -34,18 +34,18 @@ export const profileRouter = router({
     }),
 
   create: protectedProcedure
-    .input(z.object({ username: usernameSchema }))
+    .input(z.object({ username: usernameSchema, phone: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const { error } = await supabaseAdmin
         .from('profiles')
-        .insert({ user_id: ctx.userId, username: input.username })
+        .insert({ user_id: ctx.userId, username: input.username, phone: input.phone ?? null })
       if (error) {
         if (error.code === '23505') {
           throw new TRPCError({ code: 'CONFLICT', message: 'Username já existe' })
         }
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       }
-      return { username: input.username }
+      return { username: input.username, phone: input.phone ?? null }
     }),
 
   updateUsername: protectedProcedure
@@ -59,6 +59,15 @@ export const profileRouter = router({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       }
       return { username: input.username }
+    }),
+
+  updatePhone: protectedProcedure
+    .input(z.object({ phone: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const { error } = await supabaseAdmin
+        .from('profiles').update({ phone: input.phone }).eq('user_id', ctx.userId)
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      return { phone: input.phone }
     }),
 
   getTradeHistory: protectedProcedure.query(async ({ ctx }) => {
@@ -75,8 +84,8 @@ export const profileRouter = router({
       proposals.map(p => p.proposer_id === ctx.userId ? p.receiver_id : p.proposer_id),
     )]
     const { data: profiles } = await supabaseAdmin
-      .from('profiles').select('user_id, username').in('user_id', otherUserIds)
-    const profileMap = new Map((profiles ?? []).map(p => [p.user_id, p.username]))
+      .from('profiles').select('user_id, username, phone').in('user_id', otherUserIds)
+    const profileMap = new Map((profiles ?? []).map(p => [p.user_id, { username: p.username as string, phone: (p.phone as string | null) ?? null }]))
     const stickerMap = new Map(ALL_STICKERS.map(s => [s.id, s.countryName]))
 
     return proposals.map(p => {
@@ -91,7 +100,8 @@ export const profileRouter = router({
           id: (isProposer ? p.wanted_sticker : p.offered_sticker) as string,
           countryName: stickerMap.get(isProposer ? p.wanted_sticker : p.offered_sticker) ?? '',
         },
-        otherUsername: profileMap.get(isProposer ? p.receiver_id : p.proposer_id) ?? '?',
+        otherUsername: profileMap.get(isProposer ? p.receiver_id : p.proposer_id)?.username ?? '?',
+        otherPhone: profileMap.get(isProposer ? p.receiver_id : p.proposer_id)?.phone ?? null,
         date: p.updated_at as string,
       }
     })

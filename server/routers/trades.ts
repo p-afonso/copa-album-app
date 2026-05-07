@@ -258,8 +258,8 @@ export const tradesRouter = router({
     )]
 
     const { data: profiles } = await supabaseAdmin
-      .from('profiles').select('user_id, username').in('user_id', otherUserIds)
-    const profileMap = new Map((profiles ?? []).map(p => [p.user_id, p.username]))
+      .from('profiles').select('user_id, username, phone').in('user_id', otherUserIds)
+    const profileMap = new Map((profiles ?? []).map(p => [p.user_id, { username: p.username as string, phone: (p.phone as string | null) ?? null }]))
     const stickerMap = new Map(ALL_STICKERS.map(s => [s.id, { countryName: s.countryName, section: s.section }]))
 
     return (proposals ?? []).map(p => ({
@@ -268,7 +268,10 @@ export const tradesRouter = router({
       offeredSticker: { id: p.offered_sticker as string, ...(stickerMap.get(p.offered_sticker) ?? { countryName: p.offered_sticker, section: '' }) },
       wantedSticker: { id: p.wanted_sticker as string, ...(stickerMap.get(p.wanted_sticker) ?? { countryName: p.wanted_sticker, section: '' }) },
       otherUserId: (p.proposer_id === ctx.userId ? p.receiver_id : p.proposer_id) as string,
-      otherUsername: profileMap.get(p.proposer_id === ctx.userId ? p.receiver_id : p.proposer_id) ?? '?',
+      otherUsername: profileMap.get(p.proposer_id === ctx.userId ? p.receiver_id : p.proposer_id)?.username ?? '?',
+      otherPhone: p.status === 'accepted'
+        ? (profileMap.get(p.proposer_id === ctx.userId ? p.receiver_id : p.proposer_id)?.phone ?? null)
+        : null,
       proposerAlbumId: p.proposer_album as string,
       receiverAlbumId: p.receiver_album as string,
       status: p.status as 'pending' | 'accepted' | 'rejected' | 'cancelled',
