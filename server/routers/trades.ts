@@ -20,34 +20,39 @@ async function adjustSticker(
 ) {
   if (action === 'decrement') {
     const { data } = await supabaseAdmin
-      .from('album_stickers').select('quantity')
+      .from('album_stickers').select('quantity, status')
       .eq('album_id', albumId).eq('sticker_id', stickerId).maybeSingle()
-    if (!data) throw new TRPCError({ code: 'CONFLICT', message: `Figurinha ${stickerId} não encontrada` })
+    if (!data || data.status !== 'repeated')
+      throw new TRPCError({ code: 'CONFLICT', message: `Figurinha ${stickerId} não está mais disponível para troca` })
     const qty = data.quantity
     if (qty <= 1) {
-      await supabaseAdmin.from('album_stickers').delete()
+      const { error: delErr } = await supabaseAdmin.from('album_stickers').delete()
         .eq('album_id', albumId).eq('sticker_id', stickerId)
+      if (delErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: delErr.message })
     } else {
-      await supabaseAdmin.from('album_stickers')
+      const { error: updErr } = await supabaseAdmin.from('album_stickers')
         .update({ quantity: qty - 1, status: qty === 2 ? 'obtained' : 'repeated',
           updated_at: new Date().toISOString(), updated_by: updatedBy })
         .eq('album_id', albumId).eq('sticker_id', stickerId)
+      if (updErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updErr.message })
     }
   } else {
     const { data } = await supabaseAdmin
       .from('album_stickers').select('quantity')
       .eq('album_id', albumId).eq('sticker_id', stickerId).maybeSingle()
     if (!data) {
-      await supabaseAdmin.from('album_stickers').insert({
+      const { error: insErr } = await supabaseAdmin.from('album_stickers').insert({
         album_id: albumId, sticker_id: stickerId, status: 'obtained', quantity: 1,
         updated_by: updatedBy, updated_at: new Date().toISOString(),
       })
+      if (insErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: insErr.message })
     } else {
       const newQty = data.quantity + 1
-      await supabaseAdmin.from('album_stickers')
+      const { error: updErr } = await supabaseAdmin.from('album_stickers')
         .update({ quantity: newQty, status: newQty >= 2 ? 'repeated' : 'obtained',
           updated_at: new Date().toISOString(), updated_by: updatedBy })
         .eq('album_id', albumId).eq('sticker_id', stickerId)
+      if (updErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updErr.message })
     }
   }
 }
@@ -150,6 +155,8 @@ export const tradesRouter = router({
       if (!offeredRow || offeredRow.status !== 'repeated')
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Figurinha oferecida não está na lista de repetidas' })
 
+      await assertMember(input.receiverAlbumId, input.receiverId)
+
       const { data: wantedRow } = await supabaseAdmin
         .from('album_stickers').select('status')
         .eq('album_id', input.receiverAlbumId).eq('sticker_id', input.wantedSticker).maybeSingle()
@@ -188,7 +195,7 @@ export const tradesRouter = router({
       if (input.action === 'reject') {
         await supabaseAdmin.from('trade_proposals')
           .update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', input.proposalId)
-        return { status: 'rejected' as const, proposerAlbumId: '', receiverAlbumId: '' }
+        return { status: 'rejected' as const, proposerAlbumId: null as null, receiverAlbumId: null as null }
       }
 
       const { data: offeredRow } = await supabaseAdmin
@@ -203,13 +210,19 @@ export const tradesRouter = router({
       if (!wantedRow || wantedRow.status !== 'repeated')
         throw new TRPCError({ code: 'CONFLICT', message: 'Figurinha solicitada não está mais disponível' })
 
+      const { data: locked } = await supabaseAdmin
+        .from('trade_proposals')
+        .update({ status: 'accepted', updated_at: new Date().toISOString() })
+        .eq('id', input.proposalId)
+        .eq('status', 'pending')
+        .select('id')
+      if (!locked?.length)
+        throw new TRPCError({ code: 'CONFLICT', message: 'Proposta já foi respondida por outra operação' })
+
       await adjustSticker(proposal.proposer_album, proposal.offered_sticker, 'decrement', proposal.proposer_id)
       await adjustSticker(proposal.proposer_album, proposal.wanted_sticker, 'gain', proposal.proposer_id)
       await adjustSticker(proposal.receiver_album, proposal.wanted_sticker, 'decrement', ctx.userId)
       await adjustSticker(proposal.receiver_album, proposal.offered_sticker, 'gain', ctx.userId)
-
-      await supabaseAdmin.from('trade_proposals')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() }).eq('id', input.proposalId)
 
       return {
         status: 'accepted' as const,
@@ -238,10 +251,11 @@ export const tradesRouter = router({
       .order('created_at', { ascending: false })
     if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
 
+    if (!proposals?.length) return []
+
     const otherUserIds = [...new Set(
-      (proposals ?? []).map(p => p.proposer_id === ctx.userId ? p.receiver_id : p.proposer_id),
+      proposals.map(p => p.proposer_id === ctx.userId ? p.receiver_id : p.proposer_id),
     )]
-    if (otherUserIds.length === 0) return []
 
     const { data: profiles } = await supabaseAdmin
       .from('profiles').select('user_id, username').in('user_id', otherUserIds)
