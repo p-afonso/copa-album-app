@@ -16,7 +16,7 @@ export function ActionSheet({ albumId, stickerId, status, quantity, onClose }: P
   const utils = trpc.useUtils()
   const update = trpc.stickers.updateStatus.useMutation({
     onMutate: async ({ albumId, stickerId, status, quantity }) => {
-      onClose()
+      setTimeout(onClose, 80)
       await utils.stickers.list.cancel()
       const prev = utils.stickers.list.getData({ albumId })
       utils.stickers.list.setData({ albumId }, (old) =>
@@ -143,8 +143,9 @@ export function ActionSheet({ albumId, stickerId, status, quantity, onClose }: P
                   height: 54, borderRadius: 14, fontSize: 15, fontWeight: 700,
                   background: 'linear-gradient(150deg,#22c55e,#15803d)',
                   color: '#fff', border: 'none', cursor: 'pointer',
-                  boxShadow: '0 2px 10px rgba(21,128,61,0.3)',
+                  boxShadow: update.isPending ? 'none' : '0 4px 12px rgba(22,163,74,0.28)',
                   opacity: update.isPending ? 0.6 : 1,
+                  transition: 'box-shadow 0.15s ease',
                 }}
               >
                 Adicionar {qty > 1 ? `${qty} figurinhas` : 'figurinha'}
@@ -172,8 +173,9 @@ export function ActionSheet({ albumId, stickerId, status, quantity, onClose }: P
                     height: 54, borderRadius: 14, fontSize: 15, fontWeight: 700,
                     background: 'linear-gradient(150deg,#f59e0b,#b45309)',
                     color: '#fff', border: 'none', cursor: 'pointer',
-                    boxShadow: '0 2px 10px rgba(180,83,9,0.25)',
+                    boxShadow: update.isPending ? 'none' : '0 4px 12px rgba(180,83,9,0.25)',
                     opacity: update.isPending ? 0.6 : 1,
+                    transition: 'box-shadow 0.15s ease',
                   }}
                 >
                   Marcar {qty} cópias
