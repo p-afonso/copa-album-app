@@ -47,6 +47,14 @@ export function StickerCard({ id, number, status, quantity, onAction, quickMode,
   const didLongPress = useRef(false)
 
   useEffect(() => {
+    return () => { if (longPressTimer.current) clearTimeout(longPressTimer.current) }
+  }, [])
+
+  useEffect(() => {
+    if (!quickMode || status !== 'obtained') setShowOverlay(false)
+  }, [quickMode, status])
+
+  useEffect(() => {
     if (prevStatusRef.current === status) return
     const cls =
       status === 'obtained' ? 'sticker-flash-green' :
@@ -71,7 +79,7 @@ export function StickerCard({ id, number, status, quantity, onAction, quickMode,
     } else {
       onAction(id)
     }
-  }, [id, status, quickMode, onAction, onQuickAction])
+  }, [id, status, quickMode, onAction, onQuickAction, setShowOverlay])
 
   function handlePointerDown(e: React.PointerEvent) {
     if (!quickMode) return
