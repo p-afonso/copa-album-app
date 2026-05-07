@@ -21,7 +21,6 @@ export function Toast({ toast }: { toast: ToastState | null }) {
         position: 'fixed',
         bottom: 88,
         left: '50%',
-        transform: 'translateX(-50%)',
         zIndex: 100,
         background: BG[toast.variant] ?? BG.info,
         color: COLOR[toast.variant] ?? COLOR.info,

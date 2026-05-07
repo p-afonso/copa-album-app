@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 type Props = {
   onAddRepeat: () => void
@@ -8,10 +8,13 @@ type Props = {
 }
 
 export function QuickActionOverlay({ onAddRepeat, onRemove, onClose }: Props) {
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose })
+
   useEffect(() => {
-    const t = setTimeout(onClose, 2000)
+    const t = setTimeout(() => onCloseRef.current(), 2000)
     return () => clearTimeout(t)
-  }, [onClose])
+  }, [])
 
   return (
     <div
