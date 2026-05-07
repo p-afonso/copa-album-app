@@ -4,9 +4,7 @@ import type { Session } from '@supabase/supabase-js'
 import confetti from 'canvas-confetti'
 import { trpc } from '@/lib/trpc'
 import { supabaseBrowser } from '@/lib/supabase-client'
-import { useToast } from '@/hooks/useToast'
 import { StickerGrid } from './StickerGrid'
-import type { QuickActionType } from './StickerCard'
 import { ProgressPanel } from './ProgressPanel'
 import { FilterBar } from './FilterBar'
 import { ActionSheet } from './ActionSheet'
@@ -18,11 +16,9 @@ import { TradeView } from './TradeView'
 import { ProfileView } from './ProfileView'
 import { StickerGridSkeleton } from './StickerGridSkeleton'
 import { AlbumSelectionScreen } from './AlbumSelectionScreen'
-import { AlbumMembersSheet } from './AlbumMembersSheet'
 import { SetPasswordScreen } from './SetPasswordScreen'
 import { Toast } from './Toast'
-
-type StatusFilter = 'all' | 'missing' | 'obtained' | 'repeated'
+import { useToast } from '@/hooks/useToast'
 
 function LoadingSpinner() {
   return (
@@ -55,20 +51,13 @@ function fireConfetti() {
 
 export function AlbumApp() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [activeSection, setActiveSection] = useState('all')
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('album')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [quickMode, setQuickMode] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('copa_quick_mode') === '1'
-  })
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null
     return localStorage.getItem('copa_active_album_id')
   })
-  const [showMembers, setShowMembers] = useState(false)
   const [isRecovery, setIsRecovery] = useState(false)
 
   const { toast, show: showToast } = useToast()
@@ -84,7 +73,6 @@ export function AlbumApp() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Reset confetti milestones when switching albums
   useEffect(() => {
     if (activeAlbumId !== prevAlbumIdRef.current) {
       celebratedRef.current = new Set()
@@ -106,7 +94,6 @@ export function AlbumApp() {
   )
   const utils = trpc.useUtils()
 
-  // Watch progress for confetti milestones
   const { data: progress } = trpc.stickers.getProgress.useQuery(
     { albumId: activeAlbumId! },
     { enabled: !!session && !!profile.data && !!activeAlbum },
@@ -114,17 +101,19 @@ export function AlbumApp() {
   useEffect(() => {
     if (!progress || !activeAlbumId) return
     const total = progress.total ?? 1033
-    const filled = (progress.obtained ?? 0) + (progress.repeated ?? 0)
-    const ratio = filled / total
+    const obtained = progress.obtained ?? 0
+    const ratio = obtained / total
     if (ratio >= 0.5 && !celebratedRef.current.has('50')) {
       celebratedRef.current.add('50')
       fireConfetti()
+      showToast('Metade do álbum completo! 🎉', 'success', 3000)
     }
     if (ratio >= 1 && !celebratedRef.current.has('100')) {
       celebratedRef.current.add('100')
       fireConfetti()
+      showToast('Álbum completo! 🏆', 'success', 4000)
     }
-  }, [progress, activeAlbumId])
+  }, [progress, activeAlbumId, showToast])
 
   const { data: proposals = [] } = trpc.trades.listProposals.useQuery(undefined, {
     enabled: !!session && !!profile.data && !!activeAlbum,
@@ -132,58 +121,6 @@ export function AlbumApp() {
   const pendingTradesCount = proposals.filter(
     (p) => p.direction === 'incoming' && p.status === 'pending',
   ).length
-
-  const convertToShared = trpc.albums.convertToShared.useMutation({
-    onSuccess: () => {
-      utils.albums.list.invalidate()
-      setShowMembers(true)
-    },
-  })
-
-  // Quick-add mutation (mirrors ActionSheet without the close call)
-  const quickUpdate = trpc.stickers.updateStatus.useMutation({
-    onMutate: async ({ albumId, stickerId, status, quantity }) => {
-      await utils.stickers.list.cancel()
-      const prev = utils.stickers.list.getData({ albumId })
-      utils.stickers.list.setData({ albumId }, (old) =>
-        old?.map((s) => {
-          if (s.id !== stickerId) return s
-          const newQty =
-            status === 'repeated' ? (quantity ?? 2)
-            : status === 'obtained' ? 1
-            : 0
-          return { ...s, status, quantity: newQty }
-        }),
-      )
-      return { prev }
-    },
-    onError: (_err, vars, ctx) => {
-      if (ctx?.prev) utils.stickers.list.setData({ albumId: vars.albumId }, ctx.prev)
-    },
-    onSettled: (_data, _err, vars) => {
-      utils.stickers.list.invalidate({ albumId: vars.albumId })
-      utils.stickers.getProgress.invalidate({ albumId: vars.albumId })
-      utils.stickers.listDuplicates.invalidate({ albumId: vars.albumId })
-    },
-  })
-
-  const handleQuickAction = useCallback((id: string, action: QuickActionType) => {
-    if (!activeAlbumId) return
-    if (action === 'openSheet') {
-      setSelectedId(id)
-      return
-    }
-    const sticker = stickers.find(s => s.id === id)
-    if (!sticker) return
-    if (action === 'toObtained') {
-      quickUpdate.mutate({ albumId: activeAlbumId, stickerId: id, status: 'obtained' })
-    } else if (action === 'addRepeat') {
-      const newQty = (sticker.quantity ?? 1) + 1
-      quickUpdate.mutate({ albumId: activeAlbumId, stickerId: id, status: 'repeated', quantity: newQty })
-    } else if (action === 'remove') {
-      quickUpdate.mutate({ albumId: activeAlbumId, stickerId: id, status: 'missing' })
-    }
-  }, [activeAlbumId, stickers, quickUpdate])
 
   useEffect(() => {
     if (!session || !activeAlbumId) return
@@ -238,8 +175,6 @@ export function AlbumApp() {
     )
   }
 
-  const repeatedCount = stickers.filter(s => s.status === 'repeated').length
-
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 600, margin: '0 auto' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 30 }}>
@@ -267,35 +202,7 @@ export function AlbumApp() {
               {activeAlbum.name}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 60, justifyContent: 'flex-end' }}>
-            {activeAlbum.type === 'shared' ? (
-              <button
-                onClick={() => setShowMembers(true)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--text-muted)', fontSize: 12, padding: '4px 6px', borderRadius: 8,
-                }}
-              >
-                👥 {activeAlbum.memberCount}
-              </button>
-            ) : activeAlbum.role === 'owner' ? (
-              <button
-                onClick={() => convertToShared.mutate({ albumId: activeAlbumId! })}
-                disabled={convertToShared.isPending}
-                title="Compartilhar álbum"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'none', border: 'none', cursor: convertToShared.isPending ? 'not-allowed' : 'pointer',
-                  color: 'var(--text-muted)', fontSize: 16, padding: '4px 6px', borderRadius: 8,
-                  opacity: convertToShared.isPending ? 0.5 : 1,
-                }}
-              >
-                🔗
-              </button>
-            ) : null}
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>@{username}</span>
-          </div>
+          <div style={{ width: 32, minWidth: 32 }} />
         </div>
 
         <TabBar activeTab={activeTab} onChange={setActiveTab} pendingTradesCount={pendingTradesCount} />
@@ -304,16 +211,8 @@ export function AlbumApp() {
           <>
             <ProgressPanel albumId={activeAlbumId!} />
             <FilterBar
-              activeSection={activeSection}
               search={search}
-              onSectionChange={setActiveSection}
               onSearchChange={setSearch}
-              quickMode={quickMode}
-              onQuickModeChange={setQuickMode}
-              statusFilter={statusFilter}
-              onStatusFilterChange={setStatusFilter}
-              repeatedCount={repeatedCount}
-              showToast={showToast}
             />
           </>
         )}
@@ -325,12 +224,8 @@ export function AlbumApp() {
             ? <StickerGridSkeleton />
             : <StickerGrid
                 stickers={stickers}
-                activeSection={activeSection}
                 search={search}
                 onAction={handleAction}
-                quickMode={quickMode}
-                onQuickAction={handleQuickAction}
-                statusFilter={statusFilter}
               />
         ) : activeTab === 'repeated' ? (
           <RepeatedView albumId={activeAlbumId!} username={username} />
@@ -344,6 +239,13 @@ export function AlbumApp() {
           <ProfileView
             username={username}
             onUsernameChange={() => profile.refetch()}
+            albumId={activeAlbumId!}
+            albumName={activeAlbum.name}
+            albumType={activeAlbum.type}
+            isOwner={activeAlbum.role === 'owner'}
+            inviteCode={activeAlbum.inviteCode}
+            memberCount={activeAlbum.memberCount}
+            onAlbumLeft={clearAlbum}
           />
         )}
       </div>
@@ -355,17 +257,6 @@ export function AlbumApp() {
           status={stickers.find(s => s.id === selectedId)?.status ?? 'missing'}
           quantity={stickers.find(s => s.id === selectedId)?.quantity ?? 0}
           onClose={handleClose}
-        />
-      )}
-      {showMembers && activeAlbum.type === 'shared' && activeAlbum.inviteCode && (
-        <AlbumMembersSheet
-          albumId={activeAlbumId!}
-          albumName={activeAlbum.name}
-          inviteCode={activeAlbum.inviteCode}
-          isOwner={activeAlbum.role === 'owner'}
-          currentUserId=""
-          onClose={() => setShowMembers(false)}
-          onAlbumLeft={clearAlbum}
         />
       )}
 

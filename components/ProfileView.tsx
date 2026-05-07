@@ -3,10 +3,21 @@ import { useState } from 'react'
 import { trpc } from '@/lib/trpc'
 import { supabaseBrowser } from '@/lib/supabase-client'
 import { EmptyState } from './EmptyState'
+import { AlbumMembersSheet } from './AlbumMembersSheet'
 
-type Props = { username: string; onUsernameChange: () => void }
+type Props = {
+  username: string
+  onUsernameChange: () => void
+  albumId: string
+  albumName: string
+  albumType: 'shared' | 'personal'
+  isOwner: boolean
+  inviteCode?: string | null
+  memberCount?: number
+  onAlbumLeft: () => void
+}
 
-export function ProfileView({ username, onUsernameChange }: Props) {
+export function ProfileView({ username, onUsernameChange, albumId, albumName, albumType, isOwner, inviteCode, memberCount, onAlbumLeft }: Props) {
   const [editingUsername, setEditingUsername] = useState(false)
   const [newUsername, setNewUsername] = useState(username)
   const [editingPhone, setEditingPhone] = useState(false)
@@ -17,6 +28,7 @@ export function ProfileView({ username, onUsernameChange }: Props) {
   const [pwError, setPwError] = useState<string | null>(null)
   const [pwLoading, setPwLoading] = useState(false)
   const [pwSuccess, setPwSuccess] = useState(false)
+  const [showMembers, setShowMembers] = useState(false)
 
   const utils = trpc.useUtils()
   const { data: profileData } = trpc.profile.get.useQuery()
@@ -35,6 +47,13 @@ export function ProfileView({ username, onUsernameChange }: Props) {
     onSuccess: () => {
       utils.profile.get.invalidate()
       setEditingPhone(false)
+    },
+  })
+
+  const convertToShared = trpc.albums.convertToShared.useMutation({
+    onSuccess: () => {
+      utils.albums.list.invalidate()
+      setShowMembers(true)
     },
   })
 
@@ -66,6 +85,46 @@ export function ProfileView({ username, onUsernameChange }: Props) {
           @{username}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Copa 2026 · Álbum de Figurinhas</div>
+      </div>
+
+      {/* Album sharing */}
+      <div style={{ padding: '16px 16px 0', borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10 }}>
+          Álbum
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 15, color: 'var(--text)', fontWeight: 500 }}>{albumName}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
+              {albumType === 'shared' ? `Compartilhado · ${memberCount ?? 0} membros` : 'Pessoal'}
+            </div>
+          </div>
+          {albumType === 'shared' ? (
+            <button
+              onClick={() => setShowMembers(true)}
+              style={{
+                padding: '6px 14px', borderRadius: 8, border: '1.5px solid var(--border)',
+                background: 'var(--surface-2)', color: 'var(--text-muted)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              👥 Ver membros
+            </button>
+          ) : isOwner ? (
+            <button
+              onClick={() => convertToShared.mutate({ albumId })}
+              disabled={convertToShared.isPending}
+              style={{
+                padding: '6px 14px', borderRadius: 8, border: '1.5px solid var(--green-mid)',
+                background: 'var(--green-dim)', color: 'var(--green-mid)',
+                fontSize: 12, fontWeight: 600, cursor: convertToShared.isPending ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', opacity: convertToShared.isPending ? 0.6 : 1,
+              }}
+            >
+              {convertToShared.isPending ? 'Criando…' : '🔗 Compartilhar'}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Username section */}
@@ -290,6 +349,18 @@ export function ProfileView({ username, onUsernameChange }: Props) {
           Sair da conta
         </button>
       </div>
+
+      {showMembers && albumType === 'shared' && inviteCode && (
+        <AlbumMembersSheet
+          albumId={albumId}
+          albumName={albumName}
+          inviteCode={inviteCode}
+          isOwner={isOwner}
+          currentUserId=""
+          onClose={() => setShowMembers(false)}
+          onAlbumLeft={onAlbumLeft}
+        />
+      )}
     </div>
   )
 }
