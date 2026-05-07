@@ -11,6 +11,8 @@ import { LoginScreen } from './LoginScreen'
 import { OnboardingScreen } from './OnboardingScreen'
 import { TabBar, type Tab } from './TabBar'
 import { RepeatedView } from './RepeatedView'
+import { TradeView } from './TradeView'
+import { ProfileView } from './ProfileView'
 import { StickerGridSkeleton } from './StickerGridSkeleton'
 import { AlbumSelectionScreen } from './AlbumSelectionScreen'
 import { AlbumMembersSheet } from './AlbumMembersSheet'
@@ -71,6 +73,13 @@ export function AlbumApp() {
     { enabled: !!session && !!profile.data && !!activeAlbum },
   )
   const utils = trpc.useUtils()
+
+  const { data: proposals = [] } = trpc.trades.listProposals.useQuery(undefined, {
+    enabled: !!session && !!profile.data && !!activeAlbum,
+  })
+  const pendingTradesCount = proposals.filter(
+    (p) => p.direction === 'incoming' && p.status === 'pending',
+  ).length
 
   const convertToShared = trpc.albums.convertToShared.useMutation({
     onSuccess: () => {
@@ -190,7 +199,7 @@ export function AlbumApp() {
           </div>
         </div>
 
-        <TabBar activeTab={activeTab} onChange={setActiveTab} />
+        <TabBar activeTab={activeTab} onChange={setActiveTab} pendingTradesCount={pendingTradesCount} />
 
         {activeTab === 'album' && (
           <>
@@ -215,8 +224,19 @@ export function AlbumApp() {
                 search={search}
                 onAction={handleAction}
               />
-        ) : (
+        ) : activeTab === 'repeated' ? (
           <RepeatedView albumId={activeAlbumId!} username={username} />
+        ) : activeTab === 'trades' ? (
+          <TradeView
+            albumId={activeAlbumId!}
+            userId={session!.user.id}
+            marketplaceVisible={activeAlbum.marketplaceVisible}
+          />
+        ) : (
+          <ProfileView
+            username={username}
+            onUsernameChange={() => profile.refetch()}
+          />
         )}
       </div>
 
