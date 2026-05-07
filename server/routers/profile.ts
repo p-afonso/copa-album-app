@@ -51,14 +51,13 @@ export const profileRouter = router({
   updateUsername: protectedProcedure
     .input(z.object({ username: usernameSchema }))
     .mutation(async ({ ctx, input }) => {
-      const { data: conflict } = await supabaseAdmin
-        .from('profiles').select('user_id')
-        .ilike('username', input.username).neq('user_id', ctx.userId).maybeSingle()
-      if (conflict)
-        throw new TRPCError({ code: 'CONFLICT', message: 'Username já existe' })
       const { error } = await supabaseAdmin
         .from('profiles').update({ username: input.username }).eq('user_id', ctx.userId)
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      if (error) {
+        if (error.code === '23505')
+          throw new TRPCError({ code: 'CONFLICT', message: 'Username já existe' })
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      }
       return { username: input.username }
     }),
 
@@ -68,6 +67,7 @@ export const profileRouter = router({
       .or(`proposer_id.eq.${ctx.userId},receiver_id.eq.${ctx.userId}`)
       .eq('status', 'accepted')
       .order('updated_at', { ascending: false })
+      .limit(100)
     if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
     if (!proposals?.length) return []
 
