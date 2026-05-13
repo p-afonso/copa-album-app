@@ -8,17 +8,29 @@ import path from 'path'
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-// Load album reference images for few-shot prompting.
-// Place photos in public/album-ref/:
-//   team-ref.jpg    — a team page spread with MIXED stickers (some filled, some empty)
-//   fwc-ref.jpg     — the FWC History pages (optional)
-function loadRefImage(filename: string): string | null {
+// Load all reference images from public/album-ref/ for few-shot prompting.
+// Supports any number of .jpg/.jpeg/.png files.
+// For FWC/special pages, files named fwc-*.jpg are preferred; falls back to all.
+function loadRefImages(preferFwc: boolean): { base64: string; mime: string }[] {
   try {
-    const p = path.join(process.cwd(), 'public', 'album-ref', filename)
-    if (!fs.existsSync(p)) return null
-    return fs.readFileSync(p).toString('base64')
+    const dir = path.join(process.cwd(), 'public', 'album-ref')
+    if (!fs.existsSync(dir)) return []
+
+    const all = fs.readdirSync(dir)
+      .filter(f => /\.(jpe?g|png)$/i.test(f))
+      .sort()
+
+    // For FWC pages prefer fwc-* files; if none found use all
+    const preferred = preferFwc ? all.filter(f => f.toLowerCase().startsWith('fwc')) : []
+    const files = preferred.length > 0 ? preferred : all.filter(f => !f.toLowerCase().startsWith('fwc') || preferFwc)
+
+    // Cap at 3 reference images to keep token cost reasonable
+    return files.slice(0, 3).map(f => ({
+      base64: fs.readFileSync(path.join(dir, f)).toString('base64'),
+      mime: f.match(/\.png$/i) ? 'image/png' : 'image/jpeg',
+    }))
   } catch {
-    return null
+    return []
   }
 }
 
@@ -55,8 +67,7 @@ export async function POST(req: Request) {
   }
 
   const isSpecial = teamName.includes('FWC') || teamName.includes('Coca-Cola')
-  const refFile   = isSpecial ? 'fwc-ref.jpg' : 'team-ref.jpg'
-  const refBase64 = loadRefImage(refFile) ?? loadRefImage('team-ref.jpg')
+  const refImages = loadRefImages(isSpecial)
 
   const gridDesc = buildGridDesc(stickerNumbers, gridCols, gridRows)
 
@@ -95,16 +106,19 @@ STICKERS TO CLASSIFY: ${stickerNumbers.join(', ')}
 GRID (${gridRows} rows × ${gridCols} cols, left-to-right top-to-bottom):
 ${gridDesc}`
 
-  // ── Few-shot reference block (if reference image is available) ──
-  const fewShotContent: ContentPart[] = refBase64
+  // ── Few-shot reference block (all available reference images) ──
+  const fewShotContent: ContentPart[] = refImages.length > 0
     ? [
+        ...refImages.map((ref, i) => ({
+          type: 'image_url' as const,
+          image_url: {
+            url: `data:${ref.mime};base64,${ref.base64}`,
+            detail: 'low' as const,
+          },
+        })),
         {
-          type: 'image_url',
-          image_url: { url: `data:image/jpeg;base64,${refBase64}`, detail: 'low' },
-        },
-        {
-          type: 'text',
-          text: 'REFERENCE EXAMPLE — This is what a real album page looks like. Cream/white slots = MISSING. Full photo slots = OBTAINED. Use this visual reference when analyzing the next image.',
+          type: 'text' as const,
+          text: `REFERENCE EXAMPLES (${refImages.length} photo${refImages.length > 1 ? 's' : ''} of the real album) — Study these carefully. Cream/white slots with team code watermark = MISSING. Full player/team photo = OBTAINED. Use these as your visual ground-truth when analyzing the next image.`,
         },
       ]
     : []
