@@ -8,14 +8,18 @@ type StickerWithStatus = StickerDef & {
   quantity: number
 }
 
+type StatusFilter = 'all' | 'missing' | 'obtained' | 'repeated'
+
 type Props = {
   stickers: StickerWithStatus[]
   search: string
   onAction: (id: string) => void
+  statusFilter?: StatusFilter
 }
 
-export function StickerGrid({ stickers, search, onAction }: Props) {
+export function StickerGrid({ stickers, search, onAction, statusFilter = 'all' }: Props) {
   const filtered = stickers.filter((s) => {
+    if (statusFilter !== 'all' && s.status !== statusFilter) return false
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -26,7 +30,7 @@ export function StickerGrid({ stickers, search, onAction }: Props) {
   })
 
   return (
-    <div style={{ paddingBottom: 32 }}>
+    <div style={{ padding: '0 8px 32px' }}>
       {SECTIONS.map((sec) => {
         const secStickers = filtered.filter((s) => s.section === sec.id)
         if (secStickers.length === 0) return null

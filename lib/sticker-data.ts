@@ -138,22 +138,14 @@ function buildStickers(): StickerDef[] {
     }
   }
 
-  // FWC History: 00 + 1–19 = 20 figurinhas
-  stickers.push({
-    id: 'FWC00',
-    section: 'FWC',
-    countryCode: 'FWC',
-    countryName: 'FIFA World Cup History',
-    number: '00',
-    position: pos++,
-  })
-  for (let n = 1; n <= 19; n++) {
+  // FWC History: posições 00–19
+  for (let n = 0; n <= 19; n++) {
     stickers.push({
-      id: `FWC${n}`,
+      id: `FWC${String(n).padStart(2, '0')}`,
       section: 'FWC',
       countryCode: 'FWC',
       countryName: 'FIFA World Cup History',
-      number: String(n),
+      number: String(n).padStart(2, '0'),
       position: pos++,
     })
   }

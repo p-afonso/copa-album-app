@@ -103,7 +103,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
     if (!file) return
     e.target.value = ''
 
-    // Read as base64
     const reader = new FileReader()
     reader.onload = async () => {
       const dataUrl = reader.result as string
@@ -115,6 +114,8 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
       setScanError(null)
 
       try {
+        const gridCols = 7
+        const gridRows = Math.ceil(teamStickers.length / gridCols)
         const res = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -123,6 +124,9 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
             mimeType,
             teamName: page.name,
             stickerNumbers: teamStickers.map(s => s.number),
+            pageIndex,
+            gridCols,
+            gridRows,
           }),
         })
 
@@ -147,7 +151,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
     if (!scanResult || confirming) return
     setConfirming(true)
 
-    // Mark each sticker as obtained/missing based on scan result, skipping repeated ones
     for (const number of scanResult.obtained) {
       const sticker = teamStickers.find(s => s.number === number)
       if (sticker && sticker.status === 'missing') {
@@ -173,7 +176,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
     setScanError(null)
   }
 
-  // Scanning overlay
   if (scanState === 'scanning') {
     return (
       <div style={{
@@ -208,7 +210,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
     )
   }
 
-  // Confirm overlay
   if (scanState === 'confirm' && scanResult) {
     const alreadyObtained = scanResult.obtained.filter(n => {
       const s = teamStickers.find(t => t.number === n)
@@ -224,7 +225,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
         position: 'fixed', inset: 0, zIndex: 60,
         background: 'var(--bg)', display: 'flex', flexDirection: 'column',
       }}>
-        {/* Header */}
         <div style={{
           background: 'var(--surface)', borderBottom: '1px solid var(--border)',
           borderTop: '3px solid var(--green)', padding: '12px 16px',
@@ -357,7 +357,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
       position: 'fixed', inset: 0, zIndex: 60,
       background: 'var(--bg)', display: 'flex', flexDirection: 'column',
     }}>
-      {/* Hidden file input for camera */}
       <input
         ref={fileInputRef}
         type="file"
@@ -367,7 +366,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
         onChange={handleImageSelected}
       />
 
-      {/* Header */}
       <div style={{
         background: 'var(--surface)', borderBottom: '1px solid var(--border)',
         borderTop: '3px solid var(--green)', padding: '12px 16px',
@@ -400,7 +398,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
         </div>
       </div>
 
-      {/* Progress bar */}
       <div style={{ height: 4, background: 'var(--border)', overflow: 'hidden' }}>
         <div style={{
           height: '100%', width: `${pct}%`,
@@ -409,7 +406,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
         }} />
       </div>
 
-      {/* Scan CTA banner */}
       <div
         onClick={openCamera}
         style={{
@@ -434,7 +430,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
         )}
       </div>
 
-      {/* Sticker grid */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8,
@@ -454,7 +449,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
         )}
       </div>
 
-      {/* Navigation */}
       <div style={{
         background: 'var(--surface)', borderTop: '1px solid var(--border)',
         padding: '12px 16px', paddingBottom: 'env(safe-area-inset-bottom, 12px)',
@@ -498,7 +492,6 @@ export function ScanMode({ albumId, stickers, onClose }: Props) {
         >Próximo →</button>
       </div>
 
-      {/* Team picker modal */}
       {showTeamPicker && (
         <TeamPicker
           pages={ALL_PAGES}
