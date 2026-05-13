@@ -1,7 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk'
+export const dynamic = 'force-dynamic'
+
+import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export async function POST(req: Request) {
   const { imageBase64, mimeType, teamName, stickerNumbers } = await req.json() as {
@@ -20,31 +22,27 @@ export async function POST(req: Request) {
 The stickers on this page are numbered: ${stickerNumbers.join(', ')}.
 
 Look at the image carefully. Each sticker slot shows either:
-- A FILLED sticker (colorful photo/illustration placed in the slot) — this means the user HAS this sticker
-- An EMPTY slot (blank white/grey area, just a border outline) — this means the sticker is MISSING
+- A FILLED sticker (colorful photo/illustration placed in the slot) — the user HAS this sticker
+- An EMPTY slot (blank white/grey area, just a border outline) — the sticker is MISSING
 
 Return ONLY valid JSON with no explanation, in this exact format:
 {"obtained": ["1", "2", "3"], "missing": ["4", "5"]}
 
-Where "obtained" lists the numbers of stickers that are filled in the album, and "missing" lists the numbers of empty slots.
+Where "obtained" lists the numbers of stickers that are filled, and "missing" lists the numbers of empty slots.
 Include ALL sticker numbers from the list in exactly one of the two arrays.
 Only use numbers from this list: ${stickerNumbers.join(', ')}`
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-7',
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 512,
       messages: [
         {
           role: 'user',
           content: [
             {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                data: imageBase64,
-              },
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${imageBase64}` },
             },
             { type: 'text', text: prompt },
           ],
@@ -52,7 +50,7 @@ Only use numbers from this list: ${stickerNumbers.join(', ')}`
       ],
     })
 
-    const text = response.content[0].type === 'text' ? response.content[0].text : ''
+    const text = response.choices[0]?.message?.content ?? ''
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       return NextResponse.json({ error: 'Could not parse model response', raw: text }, { status: 500 })
