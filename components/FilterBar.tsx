@@ -3,16 +3,18 @@
 type Props = {
   search: string
   onSearchChange: (s: string) => void
+  onScan?: () => void
 }
 
-export function FilterBar({ search, onSearchChange }: Props) {
+export function FilterBar({ search, onSearchChange, onScan }: Props) {
   return (
     <div style={{
       background: 'var(--surface)',
       borderBottom: '1px solid var(--border)',
       padding: '10px 12px',
+      display: 'flex', gap: 8, alignItems: 'center',
     }}>
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', flex: 1 }}>
         <svg
           style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
           width="15" height="15" viewBox="0 0 15 15" fill="none"
@@ -55,6 +57,26 @@ export function FilterBar({ search, onSearchChange }: Props) {
           >✕</button>
         )}
       </div>
+
+      {onScan && (
+        <button
+          onClick={onScan}
+          title="Modo leitura — marcar página por página"
+          style={{
+            height: 38, width: 44, borderRadius: 10, flexShrink: 0,
+            background: 'var(--green-dim)',
+            border: '1.5px solid var(--green)',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <rect x="2" y="4" width="14" height="2" rx="1" fill="var(--green)" />
+            <rect x="2" y="8" width="10" height="2" rx="1" fill="var(--green)" />
+            <rect x="2" y="12" width="12" height="2" rx="1" fill="var(--green)" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }

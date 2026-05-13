@@ -68,7 +68,7 @@ export function ActionSheet({ albumId, stickerId, status, quantity, onClose }: P
 
   const number = stickerId.match(/\d+$/)?.[0] ?? ''
   const countryCode = stickerId.replace(/\d+$/, '')
-  const label = number === '00' ? '★' : number
+  const label = number
 
   const cardGradient =
     status === 'obtained' ? 'linear-gradient(150deg,#22c55e,#15803d)'
