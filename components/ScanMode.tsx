@@ -24,12 +24,16 @@ function buildTeamPages(): TeamPage[] {
 
 const ALL_PAGES = buildTeamPages()
 
-/** Returns grid cols/rows based on sticker count. 20 → 5×4, 14 → 7×2. */
+/**
+ * Returns grid cols/rows for the API prompt.
+ * Real album layout: each team spans a double-page spread, 3 cols per page.
+ * 20 stickers = 3 cols × ~7 rows (2 large at top + 3×6 grid, split across 2 pages).
+ * 14 stickers (CC) = 3 cols × 5 rows.
+ */
 function getGrid(count: number) {
-  if (count === 20) return { cols: 5, rows: 4 }
-  if (count === 14) return { cols: 7, rows: 2 }
-  const cols = 5
-  return { cols, rows: Math.ceil(count / cols) }
+  if (count === 20) return { cols: 3, rows: 7 }
+  if (count === 14) return { cols: 3, rows: 5 }
+  return { cols: 3, rows: Math.ceil(count / 3) }
 }
 
 const HEADER = 'rgba(20,28,20,0.88)'
