@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import OpenAI from 'openai'
 import { NextResponse } from 'next/server'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -15,6 +16,15 @@ export async function POST(req: Request) {
 
   if (!imageBase64 || !stickerNumbers?.length) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  // 5 scans per minute per IP
+  const ip = getClientIp(req)
+  if (!checkRateLimit(`scan:${ip}`, 5, 60_000)) {
+    return NextResponse.json(
+      { error: 'Muitas requisições. Aguarde um momento antes de escanear novamente.' },
+      { status: 429 },
+    )
   }
 
   const prompt = `You are scanning a physical FIFA World Cup 2026 sticker album page for the team "${teamName}".
