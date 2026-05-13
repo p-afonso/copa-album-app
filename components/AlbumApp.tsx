@@ -18,6 +18,7 @@ import { StickerGridSkeleton } from './StickerGridSkeleton'
 import { AlbumSelectionScreen } from './AlbumSelectionScreen'
 import { SetPasswordScreen } from './SetPasswordScreen'
 import { Toast } from './Toast'
+import { ScanMode } from './ScanMode'
 import { useToast } from '@/hooks/useToast'
 
 function LoadingSpinner() {
@@ -61,6 +62,7 @@ export function AlbumApp() {
   const [isRecovery, setIsRecovery] = useState(false)
 
   const { toast, show: showToast } = useToast()
+  const [scanOpen, setScanOpen] = useState(false)
   const celebratedRef = useRef<Set<string>>(new Set())
   const prevAlbumIdRef = useRef<string | null>(null)
 
@@ -100,8 +102,8 @@ export function AlbumApp() {
   )
   useEffect(() => {
     if (!progress || !activeAlbumId) return
-    const total = progress.total ?? 1033
-    const obtained = progress.obtained ?? 0
+    const total = progress.total ?? 994
+    const obtained = progress.collected ?? 0
     const ratio = obtained / total
     if (ratio >= 0.5 && !celebratedRef.current.has('50')) {
       celebratedRef.current.add('50')
@@ -213,6 +215,7 @@ export function AlbumApp() {
             <FilterBar
               search={search}
               onSearchChange={setSearch}
+              onScan={() => setScanOpen(true)}
             />
           </>
         )}
@@ -261,6 +264,14 @@ export function AlbumApp() {
       )}
 
       <Toast toast={toast} />
+
+      {scanOpen && (
+        <ScanMode
+          albumId={activeAlbumId!}
+          stickers={stickers}
+          onClose={() => setScanOpen(false)}
+        />
+      )}
     </div>
   )
 }

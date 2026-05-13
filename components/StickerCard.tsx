@@ -35,7 +35,7 @@ const NUM_COLOR: Record<Status, string> = {
 }
 
 export function StickerCard({ id, number, status, quantity, onAction }: Props) {
-  const label = number === '00' ? '★' : number
+  const label = number
   const [flashClass, setFlashClass] = useState('')
   const prevStatusRef = useRef(status)
 

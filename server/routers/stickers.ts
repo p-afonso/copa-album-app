@@ -100,12 +100,13 @@ export const stickersRouter = router({
 
       const obtained = (data ?? []).filter((r) => r.status === 'obtained').length
       const repeated = (data ?? []).filter((r) => r.status === 'repeated').length
-      const missing = total - obtained - repeated
+      const collected = obtained + repeated
+      const missing = total - collected
       const duplicateCount = (data ?? [])
         .filter((r) => r.status === 'repeated')
         .reduce((sum, r) => sum + (r.quantity - 1), 0)
 
-      return { total, obtained, repeated, missing, duplicateCount }
+      return { total, obtained, repeated, collected, missing, duplicateCount }
     }),
 
   listDuplicates: protectedProcedure
