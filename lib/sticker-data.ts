@@ -7,7 +7,7 @@ export type StickerDef = {
   position: number
 }
 
-const GROUPS: { group: string; teams: { code: string; name: string }[] }[] = [
+export const GROUPS: { group: string; teams: { code: string; name: string }[] }[] = [
   {
     group: 'A',
     teams: [
@@ -124,15 +124,6 @@ function buildStickers(): StickerDef[] {
 
   for (const { group, teams } of GROUPS) {
     for (const team of teams) {
-      // Posição 00 (escudo/badge)
-      stickers.push({
-        id: `${team.code}00`,
-        section: group,
-        countryCode: team.code,
-        countryName: team.name,
-        number: '00',
-        position: pos++,
-      })
       // Posições 1–20
       for (let n = 1; n <= 20; n++) {
         stickers.push({
@@ -147,14 +138,14 @@ function buildStickers(): StickerDef[] {
     }
   }
 
-  // FWC History: posições 9–19
-  for (let n = 9; n <= 19; n++) {
+  // FWC History: posições 00–19
+  for (let n = 0; n <= 19; n++) {
     stickers.push({
-      id: `FWC${n}`,
+      id: `FWC${String(n).padStart(2, '0')}`,
       section: 'FWC',
       countryCode: 'FWC',
       countryName: 'FIFA World Cup History',
-      number: String(n),
+      number: String(n).padStart(2, '0'),
       position: pos++,
     })
   }

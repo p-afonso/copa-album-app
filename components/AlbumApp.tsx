@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import confetti from 'canvas-confetti'
 import { trpc } from '@/lib/trpc'
@@ -18,6 +18,7 @@ import { StickerGridSkeleton } from './StickerGridSkeleton'
 import { AlbumSelectionScreen } from './AlbumSelectionScreen'
 import { SetPasswordScreen } from './SetPasswordScreen'
 import { Toast } from './Toast'
+import { ScanMode } from './ScanMode'
 import { useToast } from '@/hooks/useToast'
 
 function LoadingSpinner() {
@@ -49,9 +50,12 @@ function fireConfetti() {
   })
 }
 
+type StatusFilter = 'all' | 'missing' | 'obtained' | 'repeated'
+
 export function AlbumApp() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('album')
   const [activeAlbumId, setActiveAlbumId] = useState<string | null>(() => {
@@ -59,9 +63,12 @@ export function AlbumApp() {
     return localStorage.getItem('copa_active_album_id')
   })
   const [isRecovery, setIsRecovery] = useState(false)
+  const [tabAnimClass, setTabAnimClass] = useState('')
 
   const { toast, show: showToast } = useToast()
+  const [scanOpen, setScanOpen] = useState(false)
   const celebratedRef = useRef<Set<string>>(new Set())
+  const prevTabRef = useRef<Tab>('album')
   const prevAlbumIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -100,7 +107,7 @@ export function AlbumApp() {
   )
   useEffect(() => {
     if (!progress || !activeAlbumId) return
-    const total = progress.total ?? 1033
+    const total = progress.total ?? 994
     const obtained = progress.obtained ?? 0
     const ratio = obtained / total
     if (ratio >= 0.5 && !celebratedRef.current.has('50')) {
@@ -138,8 +145,19 @@ export function AlbumApp() {
     return () => { supabaseBrowser.removeChannel(channel) }
   }, [utils, session, activeAlbumId])
 
-  const handleAction = useCallback((id: string) => setSelectedId(id), [])
-  const handleClose = useCallback(() => setSelectedId(null), [])
+  const TAB_ORDER: Tab[] = ['album', 'repeated', 'trades', 'profile']
+
+  function handleTabChange(tab: Tab) {
+    const prevIdx = TAB_ORDER.indexOf(prevTabRef.current)
+    const nextIdx = TAB_ORDER.indexOf(tab)
+    setTabAnimClass(nextIdx > prevIdx ? 'tab-enter-right' : 'tab-enter-left')
+    prevTabRef.current = tab
+    setActiveTab(tab)
+    setTimeout(() => setTabAnimClass(''), 300)
+  }
+
+  function handleAction(id: string) { setSelectedId(id) }
+  function handleClose() { setSelectedId(null) }
 
   function selectAlbum(albumId: string) {
     localStorage.setItem('copa_active_album_id', albumId)
@@ -176,36 +194,41 @@ export function AlbumApp() {
   }
 
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', maxWidth: 600, margin: '0 auto' }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 30 }}>
+    <div style={{ minHeight: '100dvh', maxWidth: 600, margin: '0 auto', paddingTop: activeTab === 'album' ? 260 : 120, position: 'relative' }}>
+      <div style={{
+        position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)',
+        width: '100%', maxWidth: 600, zIndex: 30,
+        background: 'var(--glass-bg-solid)',
+        backdropFilter: 'blur(var(--glass-blur))',
+        WebkitBackdropFilter: 'blur(var(--glass-blur))',
+        borderBottom: '1px solid var(--glass-border)',
+        borderTop: '3px solid var(--green)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.04)',
+        borderRadius: '0 0 16px 16px',
+        overflow: 'hidden',
+      }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 16px', background: 'var(--surface)',
-          borderBottom: '1px solid var(--border)', borderTop: '3px solid var(--green)',
+          padding: '10px 16px',
         }}>
           <button
             onClick={clearAlbum}
             style={{
               width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--text-muted)', fontSize: 20, borderRadius: 8, minWidth: 32,
+              background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+              cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 16, borderRadius: 'var(--radius-sm)', minWidth: 32,
             }}
             title="Voltar aos álbuns"
           >
             ←
           </button>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              COPA 2026
-            </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: '0.04em', color: 'var(--text)', lineHeight: 1 }}>
-              {activeAlbum.name}
-            </div>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, letterSpacing: '0.06em', color: 'var(--text)', lineHeight: 1 }}>
+            {activeAlbum.name}
           </div>
           <div style={{ width: 32, minWidth: 32 }} />
         </div>
 
-        <TabBar activeTab={activeTab} onChange={setActiveTab} pendingTradesCount={pendingTradesCount} />
+        <TabBar activeTab={activeTab} onChange={handleTabChange} pendingTradesCount={pendingTradesCount} />
 
         {activeTab === 'album' && (
           <>
@@ -213,12 +236,18 @@ export function AlbumApp() {
             <FilterBar
               search={search}
               onSearchChange={setSearch}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              missingCount={stickers.filter(s => s.status === 'missing').length}
+              obtainedCount={stickers.filter(s => s.status === 'obtained').length}
+              repeatedCount={stickers.filter(s => s.status === 'repeated').length}
+              onScan={() => setScanOpen(true)}
             />
           </>
         )}
       </div>
 
-      <div style={{ flex: 1, paddingTop: activeTab === 'album' ? 16 : 0 }}>
+      <div className={tabAnimClass} style={{ flex: 1 }}>
         {activeTab === 'album' ? (
           isLoading
             ? <StickerGridSkeleton />
@@ -226,6 +255,7 @@ export function AlbumApp() {
                 stickers={stickers}
                 search={search}
                 onAction={handleAction}
+                statusFilter={statusFilter}
               />
         ) : activeTab === 'repeated' ? (
           <RepeatedView albumId={activeAlbumId!} username={username} />
@@ -261,6 +291,14 @@ export function AlbumApp() {
       )}
 
       <Toast toast={toast} />
+
+      {scanOpen && (
+        <ScanMode
+          albumId={activeAlbumId!}
+          stickers={stickers}
+          onClose={() => setScanOpen(false)}
+        />
+      )}
     </div>
   )
 }

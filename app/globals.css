@@ -2,29 +2,37 @@
 @import "tailwindcss";
 
 :root {
-  --bg:              #f4f7f4;
+  --bg:              #f8f9f8;
   --surface:         #ffffff;
-  --surface-2:       #eaf0ea;
-  --surface-elevated:#f8fbf8;
-  --border:          #d8e4d8;
-  --border-2:        #b8ccb8;
+  --surface-2:       #f0f2f0;
+  --surface-elevated:#fcfdfc;
+  --border:          #e5e7e5;
+  --border-2:        #d1d3d1;
   --green:           #16a34a;
   --green-mid:       #15803d;
   --green-dim:       #dcfce7;
-  --green-glow:      rgba(22, 163, 74, 0.12);
+  --green-glow:      rgba(22, 163, 74, 0.08);
   --gold:            #d97706;
   --gold-mid:        #b45309;
   --gold-dim:        #fef3c7;
-  --gold-glow:       rgba(217, 119, 6, 0.12);
+  --gold-glow:       rgba(217, 119, 6, 0.08);
   --red:             #dc2626;
-  --text:            #182818;
-  --text-muted:      #56775a;
-  --text-dim:        #7a9a7a;
+
+  --text:            #1a1a1a;
+  --text-secondary:  #6b6b6b;
+  --text-muted:      #8a8a8a;
+  --text-dim:        #a8a8a8;
+
+  /* Glass system */
+  --glass-bg:        rgba(255, 255, 255, 0.72);
+  --glass-bg-solid:  rgba(255, 255, 255, 0.85);
+  --glass-border:    rgba(0, 0, 0, 0.06);
+  --glass-blur:      12px;
 
   --radius-sm:  8px;
   --radius-md:  12px;
   --radius-lg:  16px;
-  --radius-xl:  24px;
+  --radius-xl:  20px;
 
   --text-xs:   11px;
   --text-sm:   13px;
@@ -140,3 +148,30 @@ html, body {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 .toast-enter { animation: toast-in 0.2s ease forwards; }
+
+/* Tab transitions */
+@keyframes tab-slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes tab-slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.tab-enter-right { animation: tab-slide-in-right 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+.tab-enter-left  { animation: tab-slide-in-left  0.25s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+/* Glass utilities */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+.glass-solid {
+  background: var(--glass-bg-solid);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
+}
