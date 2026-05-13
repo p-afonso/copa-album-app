@@ -11,7 +11,9 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 // Load all reference images from public/album-ref/ for few-shot prompting.
 // Supports any number of .jpg/.jpeg/.png files.
 // For FWC/special pages, files named fwc-*.jpg are preferred; falls back to all.
-function loadRefImages(preferFwc: boolean): { base64: string; mime: string }[] {
+type PageType = 'team' | 'fwc' | 'cc'
+
+function loadRefImages(pageType: PageType): { base64: string; mime: string }[] {
   try {
     const dir = path.join(process.cwd(), 'public', 'album-ref')
     if (!fs.existsSync(dir)) return []
@@ -20,9 +22,19 @@ function loadRefImages(preferFwc: boolean): { base64: string; mime: string }[] {
       .filter(f => /\.(jpe?g|png)$/i.test(f))
       .sort()
 
-    // For FWC pages prefer fwc-* files; if none found use all
-    const preferred = preferFwc ? all.filter(f => f.toLowerCase().startsWith('fwc')) : []
-    const files = preferred.length > 0 ? preferred : all.filter(f => !f.toLowerCase().startsWith('fwc') || preferFwc)
+    // Pick the most relevant files for each page type
+    let files: string[]
+    if (pageType === 'fwc') {
+      const fwc = all.filter(f => f.toLowerCase().startsWith('fwc'))
+      files = fwc.length > 0 ? fwc : all
+    } else if (pageType === 'cc') {
+      const cc = all.filter(f => f.toLowerCase().startsWith('coca'))
+      files = cc.length > 0 ? cc : all.filter(f => !f.toLowerCase().startsWith('fwc'))
+    } else {
+      // Team pages: prefer general refs, exclude fwc-* and coca-*
+      const team = all.filter(f => !f.toLowerCase().startsWith('fwc') && !f.toLowerCase().startsWith('coca'))
+      files = team.length > 0 ? team : all
+    }
 
     // Cap at 3 reference images to keep token cost reasonable
     return files.slice(0, 3).map(f => ({
@@ -66,8 +78,10 @@ export async function POST(req: Request) {
     )
   }
 
-  const isSpecial = teamName.includes('FWC') || teamName.includes('Coca-Cola')
-  const refImages = loadRefImages(isSpecial)
+  const pageType: PageType = teamName.includes('FWC') ? 'fwc'
+    : teamName.includes('Coca-Cola') ? 'cc'
+    : 'team'
+  const refImages = loadRefImages(pageType)
 
   const gridDesc = buildGridDesc(stickerNumbers, gridCols, gridRows)
 
