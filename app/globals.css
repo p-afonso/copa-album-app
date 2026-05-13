@@ -135,6 +135,12 @@ html, body {
 .sticker-flash-gold  { animation: flash-gold  0.4s ease; }
 .sticker-flash-red   { animation: flash-red   0.3s ease; }
 
+/* Scan mode pulse dots */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50%       { opacity: 1;    transform: scale(1.2); }
+}
+
 /* Team complete badge */
 @keyframes badge-appear {
   from { opacity: 0; transform: translateX(-4px); }

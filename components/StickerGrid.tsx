@@ -61,7 +61,7 @@ export function StickerGrid({ stickers, search, onAction, statusFilter = 'all' }
               </span>
               <div style={{ flex: 1, height: 1, background: 'var(--border)', marginLeft: 4 }} />
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)' }}>
-                {secStickers.filter(s => s.status === 'obtained').length}/{secStickers.length}
+                {secStickers.filter(s => s.status !== 'missing').length}/{secStickers.length}
               </span>
             </div>
 
@@ -69,7 +69,7 @@ export function StickerGrid({ stickers, search, onAction, statusFilter = 'all' }
               const teamStickers = secStickers.filter((s) => s.countryCode === team.code)
               if (teamStickers.length === 0) return null
 
-              const obtained = teamStickers.filter((s) => s.status === 'obtained').length
+              const obtained = teamStickers.filter((s) => s.status !== 'missing').length
               const pct = Math.round((obtained / teamStickers.length) * 100)
               const isComplete = pct === 100
               const isEmpty = pct === 0
@@ -118,9 +118,14 @@ export function StickerGrid({ stickers, search, onAction, statusFilter = 'all' }
                         ✦ Completo
                       </span>
                     )}
-                    {!isComplete && (
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', flexShrink: 0 }}>
+                    {!isComplete && obtained > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', flexShrink: 0 }}>
                         {obtained}/{teamStickers.length}
+                      </span>
+                    )}
+                    {!isComplete && obtained === 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', flexShrink: 0 }}>
+                        {teamStickers.length}
                       </span>
                     )}
                   </div>
