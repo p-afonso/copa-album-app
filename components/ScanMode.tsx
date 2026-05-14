@@ -17,8 +17,8 @@ function buildTeamPages(): TeamPage[] {
       pages.push({ code: t.code, name: t.name, group, groupLabel: sec?.label ?? `Grupo ${group}` })
     }
   }
-  pages.push({ code: 'FWC', name: 'FWC History', group: 'FWC', groupLabel: 'FWC' })
-  pages.push({ code: 'CC',  name: 'Coca-Cola',   group: 'CC',  groupLabel: 'CC'  })
+  pages.push({ code: 'FWC', name: 'FIFA World Cup History', group: 'FWC', groupLabel: 'FWC History' })
+  pages.push({ code: 'CC',  name: 'Coca-Cola',              group: 'CC',  groupLabel: 'Coca-Cola'  })
   return pages
 }
 
@@ -644,8 +644,8 @@ function TeamPicker({ pages, stickers, currentIndex, onSelect, onClose }: {
           })}
 
           {[
-            { code: 'FWC', name: 'FWC History', group: 'FWC' },
-            { code: 'CC',  name: 'Coca-Cola',   group: 'CC'  },
+            { code: 'FWC', name: 'FIFA World Cup History', group: 'FWC' },
+            { code: 'CC',  name: 'Coca-Cola',              group: 'CC'  },
           ].map(t => {
             const idx = pages.findIndex(p => p.code === t.code)
             const ts  = byTeam.get(`${t.code}-${t.group}`) ?? []

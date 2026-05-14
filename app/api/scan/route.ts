@@ -78,9 +78,12 @@ export async function POST(req: Request) {
     )
   }
 
-  const pageType: PageType = teamName.includes('FWC') ? 'fwc'
-    : teamName.includes('Coca-Cola') ? 'cc'
-    : 'team'
+  const normalizedTeamName = teamName.toLowerCase()
+  const pageType: PageType = normalizedTeamName.includes('fifa world cup') || normalizedTeamName.includes('fwc')
+    ? 'fwc'
+    : normalizedTeamName.includes('coca-cola')
+      ? 'cc'
+      : 'team'
   const refImages = loadRefImages(pageType)
 
   const gridDesc = buildGridDesc(stickerNumbers, gridCols, gridRows)
@@ -123,7 +126,7 @@ ${gridDesc}`
   // ── Few-shot reference block (all available reference images) ──
   const fewShotContent: ContentPart[] = refImages.length > 0
     ? [
-        ...refImages.map((ref, i) => ({
+        ...refImages.map(ref => ({
           type: 'image_url' as const,
           image_url: {
             url: `data:${ref.mime};base64,${ref.base64}`,
