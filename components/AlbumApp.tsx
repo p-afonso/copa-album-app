@@ -241,7 +241,6 @@ export function AlbumApp() {
               missingCount={stickers.filter(s => s.status === 'missing').length}
               obtainedCount={stickers.filter(s => s.status === 'obtained').length}
               repeatedCount={stickers.filter(s => s.status === 'repeated').length}
-              onScan={() => setScanOpen(true)}
             />
           </>
         )}

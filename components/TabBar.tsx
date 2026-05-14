@@ -15,7 +15,7 @@ export function TabBar({ activeTab, onChange, pendingTradesCount = 0 }: Props) {
   ]
 
   return (
-    <div className="glass" style={{ display: 'flex', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
+    <div className="glass" style={{ display: 'flex', gap: 6, borderRadius: '0 0 12px 12px', overflow: 'hidden' }}>
       {tabs.map(({ id, label }) => {
         const active = activeTab === id
         const badge = id === 'trades' && pendingTradesCount > 0 ? pendingTradesCount : 0

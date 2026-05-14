@@ -11,7 +11,6 @@ type Props = {
   missingCount?: number
   obtainedCount?: number
   repeatedCount?: number
-  onScan?: () => void
 }
 
 const STATUS_OPTIONS: { id: StatusFilter; label: string }[] = [
@@ -29,7 +28,6 @@ export function FilterBar({
   missingCount,
   obtainedCount,
   repeatedCount,
-  onScan,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -78,28 +76,6 @@ export function FilterBar({
             >✕</button>
           )}
         </div>
-
-        {onScan && (
-          <button
-            onClick={onScan}
-            title="Modo leitura — escanear página com IA"
-            style={{
-              height: 40, width: 44, borderRadius: 12, flexShrink: 0,
-              background: 'var(--glass-bg)',
-              border: '1px solid var(--glass-border)',
-              cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--green)',
-              fontSize: 18,
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <rect x="2" y="4" width="14" height="2" rx="1" fill="currentColor" />
-              <rect x="2" y="8" width="10" height="2" rx="1" fill="currentColor" />
-              <rect x="2" y="12" width="12" height="2" rx="1" fill="currentColor" />
-            </svg>
-          </button>
-        )}
 
         </div>
 
